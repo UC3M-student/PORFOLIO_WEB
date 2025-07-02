@@ -8,96 +8,124 @@ import requests
 import json
 import altair as alt
 import matplotlib.pyplot as plt
+import pandas_datareader.data as web
+import datetime
+from streamlit.components.v1 import html
 
 # ─────────────────────────────────── CONFIG & GLOBAL STYLE ────────────────────────────────────
 
-st.set_page_config(page_title="Portfolio Optimizer",
-                   page_icon="💼", layout="wide")
+st.set_page_config(
+    page_title="Portfolio Optimizer Pro",
+    page_icon="💼",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# =============== Custom CSS ======================
+# Updated Custom CSS for a polished, modern look
 CUSTOM_CSS = """
 <style>
 /* Global Styles */
-html, body, [class*="css"] {
+body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: linear-gradient(135deg, #f0f4f8 0%, #d9e7ff 100%);
-    color: #1e293b;
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    color: #1f2937;
 }
 
 /* Header Hero Section */
 .hero {
     text-align: center;
-    padding: 2rem;
-    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    padding: 3rem 2rem;
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
     animation: fadeIn 1s ease-in;
 }
 .hero h1 {
-    font-size: 3rem;
-    font-weight: 800;
+    font-size: 2.5rem;
+    font-weight: 700;
     color: #ffffff;
-    margin-bottom: 0.5rem;
-    text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.2);
+    margin-bottom: 0.75rem;
 }
 .hero p {
-    font-size: 1.2rem;
-    color: #e2e8f0;
+    font-size: 1.1rem;
+    color: #e5e7eb;
     margin-bottom: 1.5rem;
 }
 .hero .cta-button {
     background: #ffffff;
-    color: #1e3a8a;
+    color: #1e40af;
     font-weight: 600;
-    border: none;
     border-radius: 8px;
-    padding: 0.75rem 1.5rem;
+    padding: 0.75rem 2rem;
     transition: all 0.3s ease;
     text-decoration: none;
 }
 .hero .cta-button:hover {
-    background: #1e3a8a;
+    background: #1e40af;
     color: #ffffff;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* Sidebar */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #1e3a8a 0%, #3b82f6 100%);
+    background: #1e40af;
     color: #ffffff;
-    padding: 1.5rem;
-    border-right: 1px solid #e2e8f0;
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    border-right: 2px solid #e5e7eb;
 }
 section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] span {
     color: #ffffff;
     font-weight: 500;
 }
-section[data-testid="stSidebar"] img {
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    border-radius: 5px;
-}
-
-/* Buttons */
-button[kind="primary"] {
+section[data-testid="stSidebar"] .stButton > button {
     background: #ffffff;
-    color: #1e3a8a;
-    font-weight: 600;
-    border: 2px solid #1e3a8a;
+    color: #1e40af;
     border-radius: 8px;
-    padding: 0.75rem 1.5rem;
+    font-weight: 600;
     transition: all 0.3s ease;
 }
-button[kind="primary"]:hover {
-    background: #1e3a8a;
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: #1e40af;
     color: #ffffff;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Cards for Metrics */
+.stMetric {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 1.25rem;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+}
+.stMetric:hover {
+    transform: translateY(-3px);
+}
+
+/* Tabs */
+div[data-testid="stTabs"] button {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px 8px 0 0;
+    padding: 0.75rem 1.5rem;
+    color: #1e40af;
+    font-weight: 500;
+}
+div[data-testid="stTabs"] button:hover {
+    background: #eff6ff;
+}
+
+/* Charts */
+div[role="graphics-document"] {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
 }
 
 /* DataFrame Styling */
 .dataframe {
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
 }
 .dataframe tbody tr:hover {
@@ -108,89 +136,45 @@ button[kind="primary"]:hover {
     border-bottom: 1px solid #e2e8f0;
 }
 
-/* Cards for Metrics */
-.stMetric {
-    background: #ffffff;
-    border-radius: 8px;
-    padding: 1rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    margin-bottom: 1rem;
-}
-
-/* Tabs */
-div[data-testid="stTabs"] button {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px 6px 0 0;
-    padding: 0.5rem 1rem;
-    margin-right: 0.25rem;
-    color: #1e3a8a;
-}
-div[data-testid="stTabs"] button:hover {
-    background: #eff6ff;
-}
-
-/* Charts */
-div[role="graphics-document"] {
-    background: #ffffff;
-    border-radius: 8px;
-    padding: 1rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
 /* Animations */
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
-    .hero h1 { font-size: 2rem; }
+    .hero h1 { font-size: 1.8rem; }
     .hero p { font-size: 1rem; }
-    button[kind="primary"] { padding: 0.5rem 1rem; }
+    .stMetric { padding: 0.75rem; }
+    div[role="graphics-document"] { padding: 1rem; }
     .dataframe th, .dataframe td { padding: 0.5rem; }
-    div[role="graphics-document"] { padding: 0.5rem; }
 }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-
 # ─────────────────────────────────────────── HELPERS ───────────────────────────────────────────
 
 
 def interest_rates_today_usa():
-
-    import pandas_datareader.data as web
-    import datetime
-
-    # Fechas: hoy y unos días atrás (por si hoy aún no hay dato)
-    end = datetime.datetime.now()
-    start = end - datetime.timedelta(days=7)
-
-    # Descargar datos del bono a 10 años (DGS10) desde FRED
-    df = web.DataReader('DGS10', 'fred', start, end)
-
-    # Eliminar valores faltantes (por ejemplo, fines de semana o días sin dato)
-    df = df.dropna()
-
-    # Obtener el último valor disponible
-    ultimo_valor = df.iloc[-1]
-
-    interest_rate_today = float(ultimo_valor.values[0])
-
-    return interest_rate_today
+    try:
+        end = datetime.datetime.now()
+        start = end - datetime.timedelta(days=7)
+        df = web.DataReader('DGS10', 'fred', start, end).dropna()
+        return float(df.iloc[-1].values[0]) / 100
+    except Exception as e:
+        st.warning(f"Failed to fetch interest rate: {
+                   e}. Using default rate of 3%.")
+        return 0.03
 
 
-# Annual risk-free rate for Sharpe calculations
-RF = (interest_rates_today_usa() / 52.1429) / 100
+RF = interest_rates_today_usa() / 52.1429  # Weekly risk-free rate
 ROLL_WINDOW = 26  # Weeks (≈ six months)
 
 
 @st.cache_data(show_spinner=False)
 def yahoo_timeseries(tickers: list[str], period: str = "2y", interval: str = "1wk") -> pd.DataFrame:
-    """Download historical prices from Yahoo Finance."""
     try:
         df = yf.download(tickers, period=period, interval=interval, threads=True)[
             "Close"].dropna()
@@ -275,7 +259,7 @@ def markowitz_portfolio(data: pd.DataFrame, risk_aversion_lambda: float = 1.) ->
 
     res = minimize(utility, np.full(n, 1 / n), method='SLSQP', bounds=[(0, 1)] * n,
                    constraints={'type': 'eq', 'fun': lambda w: w.sum() - 1})
-    return pd.Series(res.x if res.success else np.full(n, 1 / n), index=data.columns, name="Markowitz (λ=1)")
+    return pd.Series(res.x if res.success else np.full(n, 1 / n), index=data.columns, name=f"Markowitz (λ={risk_aversion_lambda})")
 
 
 def sharpe_max_weights(data: pd.DataFrame, rf: float = RF) -> pd.Series:
@@ -357,9 +341,9 @@ def market_cap_weight_portfolio(tickers: list[str]) -> pd.Series:
 def inverse_beta_portfolio(tickers: list[str]) -> pd.Series:
     betas = [yf.Ticker(t).fast_info.get('beta', np.nan) for t in tickers]
     betas = pd.Series(betas, index=tickers, dtype='float64')
-    # if betas.isna().all() or (betas <= 0).all():
-    #     st.warning('Beta estimates unavailable → equal weights applied.')
-    return pd.Series(1 / len(tickers), index=tickers, name='Inverse Beta')
+    if betas.isna().all() or (betas <= 0).all():
+        # st.warning('Beta estimates unavailable → equal weights applied.')
+        return pd.Series(1 / len(tickers), index=tickers, name='Inverse Beta')
     betas = betas.replace(0, np.nan).fillna(betas.median())
     inv = 1 / betas.abs()
     return (inv / inv.sum()).rename('Inverse Beta')
@@ -415,93 +399,107 @@ def load_sp500_tickers() -> dict[str, str]:
 # ───────────────────────────────────────────── UI ─────────────────────────────────────────────
 
 
-# Onboarding Hero Section
+# Onboarding Hero Section with Interactive Tutorial
 if "first_load" not in st.session_state:
     st.session_state["first_load"] = True
     st.markdown(
         """
         <div class="hero">
-            <h1>Portfolio Optimizer 💼</h1>
-            <p>Unlock powerful insights to compare and explore weighting strategies for your equity portfolio.</p>
-            <a href="#configure" class="cta-button">Get Started</a>
+            <h1>Portfolio Optimizer Pro 💼</h1>
+            <p>Build and analyze equity portfolios with advanced weighting strategies. Optimize your investments with data-driven insights.</p>
+            <a href="#configure" class="cta-button">Start Optimizing</a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    # Interactive Tutorial Modal
+    html("""
+    <script>
+        if (!localStorage.getItem('tutorialShown')) {
+            setTimeout(() => {
+                alert('Welcome to Portfolio Optimizer Pro! Select 2–20 S&P 500 companies in the sidebar, adjust settings, and click "Run Analysis" to explore weighting strategies. Use the tabs to dive into performance, risk, and insights.');
+                localStorage.setItem('tutorialShown', 'true');
+            }, 1000);
+        }
+    </script>
+    """)
+
+# Sidebar with Enhanced UX
+with st.sidebar:
+    # st.image("https://via.placeholder.com/50.png?text=💼",
+    #          width=50)  # Replace with your logo
+    st.markdown("<h2 style='color: #ffffff; font-size: 1.5rem;'>Portfolio Optimizer Pro</h2>",
+                unsafe_allow_html=True)
+    st.markdown("<p style='color: #e5e7eb;'>Select S&P 500 companies to build and analyze your portfolio.</p>",
+                unsafe_allow_html=True)
+    st.divider()
+
+    # Searchable Multiselect for Companies
+    mapping = load_sp500_tickers()
+    companies = sorted(list(mapping.keys()))  # Sort for better UX
+    selected = st.multiselect(
+        "Choose companies (2–20)",
+        options=companies,
+        default=["Apple Inc.", "Microsoft Corporation"],
+        help="Select 2–20 S&P 500 companies. Type to search.",
+        max_selections=20
+    )
+
+    # Advanced Options Expander
+    with st.expander("⚙️ Advanced Settings"):
+        period = st.selectbox("Data Period", [
+                              "1y", "2y", "5y"], index=1, help="Choose the historical data period.")
+        risk_aversion = st.slider("Risk Aversion (Markowitz)", 0.1, 5.0,
+                                  1.0, 0.1, help="Adjust risk aversion for Markowitz optimization.")
+        lookback = st.slider("Momentum Lookback (weeks)", 4, 52,
+                             12, help="Set lookback period for momentum strategy.")
+
+    run_button = st.button(
+        "🚀 Run Analysis", type="primary", use_container_width=True)
+
+    # Buy Me a Coffee Button
+    st.markdown(
+        """
+        <div style="text-align: center; margin-top: 1.5rem;">
+            <a href="https://www.buymeacoffee.com/freeinvestmenteducation" target="_blank">
+                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
+                     alt="Support Us" 
+                     style="height: 45px; width: auto;"/>
+            </a>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-# Sidebar
-with st.sidebar:
-    # st.image("https://via.placeholder.com/50.png?text=💼",
-    #          width=50)  # Replace with your logo
-    st.markdown("<h2 style='color: #ffffff; font-size: 1.5rem;'>Portfolio Optimizer</h2>",
-                unsafe_allow_html=True)
-    st.markdown(
-        "<p style='color: #e2e8f0;'>Select at least two S&P 500 companies to compare weighting strategies.</p>",
-        unsafe_allow_html=True
-    )
-    st.divider()
-    st.markdown("<h3 style='color: #ffffff;'>🏢 Company Selection</h3>",
-                unsafe_allow_html=True)
-    mapping = load_sp500_tickers()
-    companies = list(mapping.keys())
-    selected = st.multiselect(
-        "Choose companies (min. 2)",
-        options=companies,
-        default=["Apple Inc.", "Microsoft Corporation"],
-        help="Select multiple companies to build your portfolio."
-    )
-    run_button = st.button(
-        "▶️ Run Analysis", type="primary", use_container_width=True
-    )
-
-# Main Title and Intro
+# Main Content
 st.markdown("<div id='configure'></div>", unsafe_allow_html=True)
-st.title('Portfolio Optimizer')
+st.title('Portfolio Optimizer Pro')
 st.markdown(
-    'Compare and explore different weighting approaches for an equity portfolio. '
-    '<span style="font-size:0.9rem; color:#64748b;">**Educational purposes only — not investment advice.**</span>',
-    unsafe_allow_html=True
-)
-
-# Inside the `with st.sidebar:` block, after the existing content ; BuymeaCoffe
-st.markdown(
-    """
-    <div style="text-align: center; margin-top: 1rem;">
-        <a href="https://www.buymeacoffee.com/freeinvestmenteducation" target="_blank">
-            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
-                 alt="Buy Me a Coffee" 
-                 style="height: 45px; width: auto; margin: 0 auto;"/>
-        </a>
-    </div>
-    """,
+    'Analyze and optimize equity portfolios with cutting-edge weighting strategies. '
+    '<span style="font-size:0.9rem; color:#6b7280;">For educational purposes only — not investment advice.</span>',
     unsafe_allow_html=True
 )
 
 if not run_button:
-    st.info(
-        'Configure your portfolio in the sidebar and press **Run Analysis** to begin.')
+    st.info('Select companies and settings in the sidebar, then click **Run Analysis** to begin.')
     st.stop()
 
 # Input Validation
 if len(selected) < 2:
-    st.warning(
-        "Oops! Please select at least **two companies** in the sidebar to build your portfolio. "
-        "Try adding companies like Apple or Microsoft to get started!"
-    )
+    st.warning("Please select at least **two companies** to build your portfolio.")
     st.stop()
-
 if len(selected) > 20:
-    st.warning("Please select up to 20 companies to ensure optimal performance.")
+    st.warning("Please select up to 20 companies for optimal performance.")
     st.stop()
 
 # Data Fetching with Progress Bar
-with st.spinner('Downloading prices and calculating weights …'):
+with st.spinner('Fetching data and optimizing portfolio …'):
     progress = st.progress(0)
     progress.progress(10)
     tickers = [mapping[n] for n in selected]
     progress.progress(30)
-    price_data = yahoo_timeseries(tickers)
-    benchmark_data = yahoo_timeseries(['^GSPC'])
+    price_data = yahoo_timeseries(tickers, period=period)
+    benchmark_data = yahoo_timeseries(['^GSPC'], period=period)
     progress.progress(60)
     if price_data.empty or benchmark_data.empty:
         st.error(
@@ -513,11 +511,11 @@ with st.spinner('Downloading prices and calculating weights …'):
     weights = {
         'Minimum Variance': portfolio_minimum_variance(price_data),
         'Risk Parity': portfolio_risk_parity(price_data),
-        'Markowitz (λ=1)': markowitz_portfolio(price_data),
+        'Markowitz': markowitz_portfolio(price_data, risk_aversion_lambda=risk_aversion),
         'Maximum Sharpe': sharpe_max_weights(price_data),
         'Equal Weight': equal_weight_portfolio(price_data),
         'Maximum Diversification': max_diversification_portfolio(price_data),
-        'Momentum': momentum_weights(price_data),
+        'Momentum': momentum_weights(price_data, lookback=lookback),
         'Minimum Correlation': min_correlation_portfolio(price_data),
         'Inverse Volatility': inverse_volatility_portfolio(price_data),
         'Equal Risk Contribution': equal_risk_contribution_portfolio(price_data),
@@ -559,51 +557,55 @@ with st.spinner('Downloading prices and calculating weights …'):
     progress.empty()
 
 # Save Portfolio Config
-with st.sidebar:
-    if run_button and selected:
-        config = {"tickers": selected}
-        config_json = json.dumps(config).encode("utf-8")
-        st.download_button(
-            "💾 Save Portfolio Config",
-            config_json,
-            file_name="portfolio_config.json",
-            mime="application/json",
-            use_container_width=True
-        )
+# with st.sidebar:
+#     if run_button and selected:
+#         config = {"tickers": selected, "period": period,
+#                   "risk_aversion": risk_aversion, "lookback": lookback}
+#         config_json = json.dumps(config).encode("utf-8")
+#         st.download_button(
+#             "💾 Save Portfolio Config",
+#             config_json,
+#             file_name="portfolio_config.json",
+#             mime="application/json",
+#             use_container_width=True
+#         )
 
 # ───────────────────────────────────────── TABS ───────────────────────────────────────────
 
-st.markdown("### Explore Portfolio Strategies")
-tab_groups = st.tabs(["Core Analysis", "Risk Metrics", "Advanced Insights"])
+st.markdown("### Portfolio Analysis Dashboard")
+tab_groups = st.tabs(
+    ["📊 Core Analysis", "⚠️ Risk Insights", "🔍 Advanced Metrics"])
 
 # Core Analysis
 with tab_groups[0]:
-    core_tabs = st.tabs(["📊 Weights", "📈 Performance", "📅 Price History"])
+    core_tabs = st.tabs(["Weights", "Performance", "Price History"])
     with core_tabs[0]:
-        st.subheader("Weights by Strategy")
-        st.dataframe(weights_df, use_container_width=True,
-                     height=min(480, 80 + 32 * len(tickers)))
+        st.subheader("Portfolio Weights by Strategy")
+        st.dataframe(
+            weights_df.style.format(
+                "{:.2%}").background_gradient(cmap="Blues"),
+            use_container_width=True,
+            height=min(480, 80 + 32 * len(tickers))
+        )
         long_df = weights_df.T.reset_index().melt(
             id_vars='index', var_name='Ticker', value_name='Weight')
         chart = alt.Chart(long_df).mark_bar().encode(
             x=alt.X("index:N", title="Strategy", axis=alt.Axis(labelAngle=45)),
             y=alt.Y("Weight:Q", stack="normalize",
                     title="Weight", axis=alt.Axis(format="%")),
-            color=alt.Color("Ticker:N", scale=alt.Scale(scheme="category10")),
+            color=alt.Color("Ticker:N", scale=alt.Scale(scheme="tableau10")),
             tooltip=["Ticker", alt.Tooltip("Weight", format=".1%")]
         ).properties(
             width="container",
-            height=420,
-            title=alt.Title("Portfolio Weights by Strategy",
-                            subtitle="Normalized weights for selected companies")
+            height=450,
+            title=alt.Title("Portfolio Weights",
+                            subtitle="Allocation across strategies")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e3a8a")
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
+        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(chart, use_container_width=True)
         st.markdown(
-            '<span style="font-size:0.9rem; color:#64748b;">'
-            'Chart shows the normalized weights of each ticker across different portfolio strategies.'
-            '</span>',
+            '<span style="font-size:0.9rem; color:#6b7280;">Chart shows normalized weights of each ticker across strategies.</span>',
             unsafe_allow_html=True
         )
         csv = weights_df.to_csv().encode("utf-8")
@@ -611,58 +613,60 @@ with tab_groups[0]:
                            file_name="weights.csv", mime="text/csv", use_container_width=True)
 
     with core_tabs[1]:
-        st.subheader("Portfolio Performance (static weights)")
+        st.subheader("Portfolio Performance (Static Weights)")
         cum_df = (1 + portfolio_returns_df).cumprod().reset_index().melt(
             id_vars='Date', var_name='Strategy', value_name='Cumulative Return')
+        selection = alt.selection_single(fields=['Strategy'], bind='legend')
         perf_chart = alt.Chart(cum_df).mark_line().encode(
             x="Date:T",
             y="Cumulative Return:Q",
             color="Strategy:N",
+            opacity=alt.condition(selection, alt.value(1.0), alt.value(0.3)),
             tooltip=["Date:T", "Strategy", alt.Tooltip(
                 "Cumulative Return:Q", format=".2f")]
-        ).interactive().properties(
+        ).add_selection(selection).interactive().properties(
             height=450,
-            title=alt.Title("Cumulative Portfolio Returns",
-                            subtitle="Performance of all strategies over time")
+            title=alt.Title("Cumulative Returns",
+                            subtitle="Performance across strategies")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e3a8a")
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
+        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(perf_chart, use_container_width=True)
-        st.markdown("**Key Metrics**")
-        for strategy in portfolio_returns_df.columns:
+        st.markdown("**Key Performance Metrics**")
+        cols = st.columns(5)
+        for i, strategy in enumerate(portfolio_returns_df.columns):
             metrics = performance_metrics(portfolio_returns_df[strategy])
-            st.markdown(f"#### {strategy}")
-            cols = st.columns(5)
-            cols[0].metric("Total Return", f"{metrics['Total Return']:.2%}")
-            cols[1].metric("Ann. Return", f"{metrics['Ann. Return']:.2%}")
-            cols[2].metric("Ann. Volatility", f"{
-                           metrics['Ann. Volatility']:.2%}")
-            cols[3].metric("Sharpe Ratio", f"{metrics['Sharpe']:.2f}")
-            cols[4].metric("Max Drawdown", f"{metrics['Max Drawdown']:.2%}")
+            with cols[i % 5]:
+                st.metric(f"{strategy} Ann. Return", f"{
+                          metrics['Ann. Return']:.2%}")
+                st.metric(f"{strategy} Sharpe", f"{metrics['Sharpe']:.2f}")
+                st.metric(f"{strategy} Max Drawdown", f"{
+                          metrics['Max Drawdown']:.2%}")
 
     with core_tabs[2]:
-        st.subheader("Weekly Closing Prices (last 2 years)")
+        st.subheader("Historical Weekly Closing Prices")
         price_long = price_data.reset_index().melt(
             id_vars='Date', var_name='Ticker', value_name='Price')
         price_chart = alt.Chart(price_long).mark_line().encode(
             x="Date:T",
             y="Price:Q",
             color="Ticker:N",
-            tooltip=["Date:T", "Ticker", "Price"]
+            tooltip=["Date:T", "Ticker", alt.Tooltip("Price:Q", format=".2f")]
         ).interactive().properties(
             height=450,
-            title=alt.Title(
-                "Historical Prices", subtitle="Weekly closing prices for selected companies")
+            title=alt.Title("Historical Prices",
+                            subtitle=f"Weekly closing prices for {period}")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e3a8a")
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
+        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(price_chart, use_container_width=True)
 
-# Risk Metrics
+# Risk Insights
 with tab_groups[1]:
-    risk_tabs = st.tabs(["🔗 Correlation", "⚠️ Risk", "📉 Strategy Drawdowns"])
+    risk_tabs = st.tabs(
+        ["🔗 Correlation", "⚠️ Risk Overview", "📉 Strategy Drawdowns"])
     with risk_tabs[0]:
-        st.subheader("Correlation Matrix (returns)")
+        st.subheader("Correlation Matrix (Returns)")
         corr_matrix = price_data.pct_change().dropna().corr().round(2)
         fig, ax = plt.subplots(
             figsize=(len(tickers) * 0.6 + 2, len(tickers) * 0.6 + 2))
@@ -681,7 +685,7 @@ with tab_groups[1]:
 
     with risk_tabs[1]:
         st.subheader("Risk Overview")
-        st.markdown("**Rolling 12-week Volatility (tickers)**")
+        st.markdown("**Rolling 12-Week Volatility (Tickers)**")
         roll_vol = price_data.pct_change().rolling(12).std() * np.sqrt(52)
         roll_long = roll_vol.reset_index().melt(
             id_vars='Date', var_name='Ticker', value_name='Volatility')
@@ -696,8 +700,8 @@ with tab_groups[1]:
             title=alt.Title(
                 "Rolling Volatility", subtitle="12-week annualized volatility for each ticker")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e3a8a")
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
+        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(vol_chart, use_container_width=True)
         st.markdown("**Drawdown Chart (Equal Weight Portfolio)**")
         eq_series = portfolio_returns(
@@ -714,7 +718,7 @@ with tab_groups[1]:
             title=alt.Title("Equal Weight Portfolio Drawdown",
                             subtitle="Maximum loss from peak")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
         )
         st.altair_chart(dd_chart, use_container_width=True)
 
@@ -733,18 +737,22 @@ with tab_groups[1]:
             title=alt.Title("Strategy Drawdowns",
                             subtitle="Maximum loss from peak for each strategy")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e3a8a")
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
+        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(dd_chart_all, use_container_width=True)
-        st.dataframe(drawdown_df.round(3).tail(10), use_container_width=True, height=min(
-            400, 80 + 32 * len(drawdown_df.tail(10))))
+        st.dataframe(
+            drawdown_df.round(3).style.format(
+                "{:.2%}").background_gradient(cmap="Reds"),
+            use_container_width=True,
+            height=min(400, 80 + 32 * len(drawdown_df.tail(10)))
+        )
 
-# Advanced Insights
+# Advanced Metrics
 with tab_groups[2]:
     insight_tabs = st.tabs(["📈 Rolling Sharpe", "📊 Market Beta",
                            "🔗 Rolling Correlation", "📉 Return Distribution"])
     with insight_tabs[0]:
-        st.subheader("26-Week Rolling Sharpe Ratios (annualised)")
+        st.subheader("26-Week Rolling Sharpe Ratios (Annualized)")
         rs_long = rolling_sharpe_df.reset_index().melt(
             id_vars='Date', var_name='Strategy', value_name='Sharpe')
         rs_chart = alt.Chart(rs_long).mark_line().encode(
@@ -758,11 +766,15 @@ with tab_groups[2]:
             title=alt.Title("Rolling Sharpe Ratios",
                             subtitle="26-week annualized Sharpe ratios")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e3a8a")
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
+        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(rs_chart, use_container_width=True)
-        st.dataframe(rolling_sharpe_df.round(3).tail(10), use_container_width=True, height=min(
-            400, 80 + 32 * len(rolling_sharpe_df.tail(10))))
+        st.dataframe(
+            rolling_sharpe_df.round(
+                3).style.background_gradient(cmap="Greens"),
+            use_container_width=True,
+            height=min(400, 80 + 32 * len(rolling_sharpe_df.tail(10)))
+        )
 
     with insight_tabs[1]:
         st.subheader("CAPM Beta vs S&P 500")
@@ -775,11 +787,14 @@ with tab_groups[2]:
             title=alt.Title(
                 "Market Beta", subtitle="CAPM beta relative to S&P 500")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
         )
         st.altair_chart(beta_chart, use_container_width=True)
-        st.dataframe(beta_df.round(3), use_container_width=True,
-                     height=min(400, 80 + 32 * len(beta_df)))
+        st.dataframe(
+            beta_df.round(3).style.background_gradient(cmap="Purples"),
+            use_container_width=True,
+            height=min(400, 80 + 32 * len(beta_df))
+        )
 
     with insight_tabs[2]:
         st.subheader("26-Week Rolling Correlation with S&P 500")
@@ -796,11 +811,14 @@ with tab_groups[2]:
             title=alt.Title("Rolling Correlation",
                             subtitle="26-week correlation with S&P 500")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e3a8a")
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
+        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(rc_chart, use_container_width=True)
-        st.dataframe(rolling_corr_df.round(3).tail(10), use_container_width=True, height=min(
-            400, 80 + 32 * len(rolling_corr_df.tail(10))))
+        st.dataframe(
+            rolling_corr_df.round(3).style.background_gradient(cmap="Blues"),
+            use_container_width=True,
+            height=min(400, 80 + 32 * len(rolling_corr_df.tail(10)))
+        )
 
     with insight_tabs[3]:
         st.subheader("Weekly Return Distribution")
@@ -818,15 +836,17 @@ with tab_groups[2]:
             title=alt.Title("Return Distribution",
                             subtitle="Distribution of weekly returns by strategy")
         ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=14, titleColor="#1e3a8a"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e3a8a")
+            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
+        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(hist_chart, use_container_width=True)
 
-# Footer
+# Footer with Professional Branding
 st.markdown(
     """
-    <div style="text-align: center; padding: 2rem 0; color: #64748b;">
-        <span>Portfolio Optimizer by Free Investment Education | © 2025 | For educational purposes only — not investment advice.</span>
+    <div style="text-align: center; padding: 2rem 0; color: #6b7280;">
+        <span>Portfolio Optimizer Pro by Free Investment Education | © 2025 | For educational purposes only.</span><br>
+        <a href="https://www.investopedia.com/terms/p/portfolio-weight.asp" style="color: #1e40af;">Learn More</a> | 
+        <a href="mailto:freeinvestmenteducation@gmail.com" style="color: #1e40af;">Contact Us</a>
     </div>
     """,
     unsafe_allow_html=True
