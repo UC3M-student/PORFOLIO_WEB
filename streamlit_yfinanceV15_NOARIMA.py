@@ -156,6 +156,7 @@ div[role="graphics-document"] {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+
 # ─────────────────────────────────────────── HELPERS ───────────────────────────────────────────
 
 
@@ -459,6 +460,20 @@ st.title('Portfolio Optimizer')
 st.markdown(
     'Compare and explore different weighting approaches for an equity portfolio. '
     '<span style="font-size:0.9rem; color:#64748b;">**Educational purposes only — not investment advice.**</span>',
+    unsafe_allow_html=True
+)
+
+# Inside the `with st.sidebar:` block, after the existing content ; BuymeaCoffe
+st.markdown(
+    """
+    <div style="text-align: center; margin-top: 1rem;">
+        <a href="https://www.buymeacoffee.com/freeinvestmenteducation" target="_blank">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
+                 alt="Buy Me a Coffee" 
+                 style="height: 45px; width: auto; margin: 0 auto;"/>
+        </a>
+    </div>
+    """,
     unsafe_allow_html=True
 )
 
@@ -812,6 +827,21 @@ st.markdown(
     """
     <div style="text-align: center; padding: 2rem 0; color: #64748b;">
         <span>Portfolio Optimizer by Free Investment Education | © 2025 | For educational purposes only — not investment advice.</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# Inside the `with st.sidebar:` block, after the existing content; ; BuymeaCoffe
+st.markdown(
+    """
+    <div style="text-align: center; margin-top: 1rem;">
+        <a href="https://www.buymeacoffee.com/freeinvestmenteducation" target="_blank">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
+                 alt="Buy Me a Coffee" 
+                 style="height: 45px; width: auto; margin: 0 auto;"/>
+        </a>
     </div>
     """,
     unsafe_allow_html=True
