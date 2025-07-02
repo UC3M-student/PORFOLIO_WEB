@@ -8,3 +8,4 @@ altair
 pandas_datareader
 requests
 setuptools
+plotly
