@@ -16,7 +16,7 @@ from streamlit.components.v1 import html
 
 st.set_page_config(
     page_title="Portfolio Optimizer Pro",
-    page_icon="💼",
+    page_icon="Portfolio Optimizer AI 💼",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -412,17 +412,17 @@ if "first_load" not in st.session_state:
         """,
         unsafe_allow_html=True
     )
-    # Interactive Tutorial Modal
-    html("""
-    <script>
-        if (!localStorage.getItem('tutorialShown')) {
-            setTimeout(() => {
-                alert('Welcome to Portfolio Optimizer Pro! Select 2–20 S&P 500 companies in the sidebar, adjust settings, and click "Run Analysis" to explore weighting strategies. Use the tabs to dive into performance, risk, and insights.');
-                localStorage.setItem('tutorialShown', 'true');
-            }, 1000);
-        }
-    </script>
-    """)
+    # # Interactive Tutorial Modal
+    # html("""
+    # <script>
+    #     if (!localStorage.getItem('tutorialShown')) {
+    #         setTimeout(() => {
+    #             alert('Welcome to Portfolio Optimizer Pro! Select 2–20 S&P 500 companies in the sidebar, adjust settings, and click "Run Analysis" to explore weighting strategies. Use the tabs to dive into performance, risk, and insights.');
+    #             localStorage.setItem('tutorialShown', 'true');
+    #         }, 1000);
+    #     }
+    # </script>
+    # """)
 
 # Sidebar with Enhanced UX
 with st.sidebar:
