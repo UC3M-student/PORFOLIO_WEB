@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: best-porfolio-weights-web
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "streamlit run streamlit_yfinanceV15_NOARIMA.py --server.port $PORT --server.address 0.0.0.0"
+    runtime: python
+    pythonVersion: 3.11.9
