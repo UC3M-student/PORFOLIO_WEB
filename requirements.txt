@@ -7,3 +7,4 @@ matplotlib
 altair
 pandas_datareader
 requests
+setuptools
