@@ -11,17 +11,24 @@ import matplotlib.pyplot as plt
 import pandas_datareader.data as web
 import datetime
 from streamlit.components.v1 import html
+import plotly.express as px  # Added for interactive scatter plot
 
 # ─────────────────────────────────── CONFIG & GLOBAL STYLE ────────────────────────────────────
 
 st.set_page_config(
-    page_title="Portfolio Optimizer Pro",
-    page_icon="Portfolio Optimizer AI 💼",
+    page_title="Portfolio Optimizer AI",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Updated Custom CSS for a polished, modern look
+# Inject Google AdSense meta tag
+st.markdown(
+    '<meta name="google-adsense-account" content="ca-pub-6317750745008007">',
+    unsafe_allow_html=True
+)
+
+# Updated Custom CSS (unchanged from original)
 CUSTOM_CSS = """
 <style>
 /* Global Styles */
@@ -183,7 +190,53 @@ def yahoo_timeseries(tickers: list[str], period: str = "2y", interval: str = "1w
         st.error(f"Error fetching price data: {e}")
         return pd.DataFrame()
 
-# ---------- ALLOCATION ENGINES ---------------------------------------------------------------
+
+@st.cache_data(show_spinner=False)
+def fetch_fundamentals(tickers: list[str]) -> pd.DataFrame:
+    fundamentals = []
+    for ticker in tickers:
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            fundamentals.append({
+                'Ticker': ticker,
+                'P/E Ratio': info.get('trailingPE', np.nan),
+                'Dividend Yield': info.get('dividendYield', np.nan),
+                'Market Cap': info.get('marketCap', np.nan),
+                'Beta': info.get('beta', np.nan),
+                # Earnings Per Share (Trailing Twelve Months)
+                'EPS (TTM)': info.get('trailingEps', np.nan),
+                'Book Value Per Share': info.get('bookValue', np.nan),
+                'Debt-to-Equity Ratio': info.get('debtToEquity', np.nan),
+                'Current Ratio': info.get('currentRatio', np.nan),
+                # Trailing Twelve Months Revenue
+                'Revenue (TTM)': info.get('totalRevenue', np.nan),
+                'Profit Margin': info.get('profitMargins', np.nan),
+                'Operating Margin': info.get('operatingMargins', np.nan),
+                'Return on Equity': info.get('returnOnEquity', np.nan)
+            })
+        except Exception as e:
+            st.error(f"Error fetching fundamentals for {ticker}: {e}")
+            fundamentals.append({'Ticker': ticker, 'P/E Ratio': np.nan, 'Dividend Yield': np.nan,
+                                'Market Cap': np.nan, 'Beta': np.nan, 'EPS (TTM)': np.nan,
+                                 'Book Value Per Share': np.nan, 'Debt-to-Equity Ratio': np.nan,
+                                 'Current Ratio': np.nan, 'Revenue (TTM)': np.nan,
+                                 'Profit Margin': np.nan, 'Operating Margin': np.nan,
+                                 'Return on Equity': np.nan})
+    return pd.DataFrame(fundamentals)
+
+
+def monte_carlo_simulation(returns: pd.DataFrame, weights: pd.Series, n_simulations: int = 400, horizon: int = 52) -> pd.DataFrame:
+    mu = returns.mean()
+    cov = returns.cov()
+    n_assets = len(weights)
+    sim_returns = np.zeros((horizon, n_simulations))
+    for i in range(n_simulations):
+        sim = np.random.multivariate_normal(mu, cov, horizon)
+        sim_returns[:, i] = np.cumsum(sim @ weights)
+    return pd.DataFrame(sim_returns, columns=[f'Sim {i+1}' for i in range(n_simulations)])
+
+# ---------- ALLOCATION ENGINES (unchanged from original) -------------------------------------
 
 
 def portfolio_minimum_variance(data: pd.DataFrame) -> pd.Series:
@@ -342,7 +395,6 @@ def inverse_beta_portfolio(tickers: list[str]) -> pd.Series:
     betas = [yf.Ticker(t).fast_info.get('beta', np.nan) for t in tickers]
     betas = pd.Series(betas, index=tickers, dtype='float64')
     if betas.isna().all() or (betas <= 0).all():
-        # st.warning('Beta estimates unavailable → equal weights applied.')
         return pd.Series(1 / len(tickers), index=tickers, name='Inverse Beta')
     betas = betas.replace(0, np.nan).fillna(betas.median())
     inv = 1 / betas.abs()
@@ -355,6 +407,15 @@ def max_return_portfolio(data: pd.DataFrame) -> pd.Series:
     w = pd.Series(0, index=data.columns)
     w[winner] = 1.
     return w.rename('Maximum Return')
+
+
+def custom_allocation(tickers: list[str], custom_weights: list[float]) -> pd.Series:
+    w = pd.Series(custom_weights, index=tickers, name="Custom Allocation")
+    if abs(w.sum() - 1.0) > 0.01 or w.min() < 0:
+        st.warning(
+            "Custom weights must sum to 100% and be non-negative. Using equal weights.")
+        return pd.Series(1 / len(tickers), index=tickers, name="Custom Allocation")
+    return w
 
 # ---------- PERFORMANCE HELPERS ---------------------------------------------------------------
 
@@ -371,8 +432,7 @@ def portfolio_returns(data: pd.DataFrame, w: pd.Series) -> pd.Series:
 def performance_metrics(series: pd.Series, rf: float = RF) -> dict:
     cum = (1 + series).cumprod()
     total_return = cum.iloc[-1] - 1
-    ann_return = (1 + total_return) ** (52 / len(series)) - \
-        1  # Weekly → annual
+    ann_return = (1 + total_return) ** (52 / len(series)) - 1
     ann_vol = series.std() * np.sqrt(52)
     sharpe = (ann_return - rf) / ann_vol if ann_vol != 0 else np.nan
     mdd = (cum / cum.cummax() - 1).min()
@@ -399,36 +459,23 @@ def load_sp500_tickers() -> dict[str, str]:
 # ───────────────────────────────────────────── UI ─────────────────────────────────────────────
 
 
-# Onboarding Hero Section with Interactive Tutorial
+# Onboarding Hero Section
 if "first_load" not in st.session_state:
     st.session_state["first_load"] = True
     st.markdown(
         """
         <div class="hero">
-            <h1>Portfolio Optimizer Pro 💼</h1>
-            <p>Build and analyze equity portfolios with advanced weighting strategies. Optimize your investments with data-driven insights.</p>
+            <h1>Portfolio Optimizer AI 🤖</h1>
+            <p>Build, analyze, and simulate equity portfolios with advanced weighting strategies and data-driven insights.</p>
             <a href="#configure" class="cta-button">Start Optimizing</a>
         </div>
         """,
         unsafe_allow_html=True
     )
-    # # Interactive Tutorial Modal
-    # html("""
-    # <script>
-    #     if (!localStorage.getItem('tutorialShown')) {
-    #         setTimeout(() => {
-    #             alert('Welcome to Portfolio Optimizer Pro! Select 2–20 S&P 500 companies in the sidebar, adjust settings, and click "Run Analysis" to explore weighting strategies. Use the tabs to dive into performance, risk, and insights.');
-    #             localStorage.setItem('tutorialShown', 'true');
-    #         }, 1000);
-    #     }
-    # </script>
-    # """)
 
 # Sidebar with Enhanced UX
 with st.sidebar:
-    # st.image("https://via.placeholder.com/50.png?text=💼",
-    #          width=50)  # Replace with your logo
-    st.markdown("<h2 style='color: #ffffff; font-size: 1.5rem;'>Portfolio Optimizer Pro</h2>",
+    st.markdown("<h2 style='color: #ffffff; font-size: 1.5rem;'>Portfolio Optimizer AI</h2>",
                 unsafe_allow_html=True)
     st.markdown("<p style='color: #e5e7eb;'>Select S&P 500 companies to build and analyze your portfolio.</p>",
                 unsafe_allow_html=True)
@@ -436,7 +483,7 @@ with st.sidebar:
 
     # Searchable Multiselect for Companies
     mapping = load_sp500_tickers()
-    companies = sorted(list(mapping.keys()))  # Sort for better UX
+    companies = sorted(list(mapping.keys()))
     selected = st.multiselect(
         "Choose companies (2–20)",
         options=companies,
@@ -447,12 +494,27 @@ with st.sidebar:
 
     # Advanced Options Expander
     with st.expander("⚙️ Advanced Settings"):
-        period = st.selectbox("Data Period", [
-                              "1y", "2y", "5y"], index=1, help="Choose the historical data period.")
-        risk_aversion = st.slider("Risk Aversion (Markowitz)", 0.1, 5.0,
-                                  1.0, 0.1, help="Adjust risk aversion for Markowitz optimization.")
-        lookback = st.slider("Momentum Lookback (weeks)", 4, 52,
-                             12, help="Set lookback period for momentum strategy.")
+        period = st.selectbox("Data Period", ["1y", "2y", "5y"], index=1)
+        risk_aversion = st.slider(
+            "Risk Aversion (Markowitz)", 0.1, 5.0, 1.0, 0.1)
+        lookback = st.slider("Momentum Lookback (weeks)", 4, 52, 12)
+        n_simulations = st.slider(
+            "Monte Carlo Simulations", 100, 100, 500, 100)
+        transaction_cost = st.slider(
+            "Transaction Cost (%)", 0.0, 1.0, 0.0, 0.01)
+
+    # Custom Allocation Input
+    with st.expander("🛠️ Custom Allocation"):
+        custom_weights = []
+        if selected:
+            st.markdown(
+                "Enter weights (as decimals, e.g., 0.3 for 30%) that sum to 1.0:")
+            for ticker in [mapping[n] for n in selected]:
+                weight = st.number_input(f"Weight for {
+                                         ticker}", min_value=0.0, max_value=1.0, value=1.0/len(selected), step=0.01)
+                custom_weights.append(weight)
+            if st.button("Apply Custom Weights"):
+                st.session_state["custom_weights"] = custom_weights
 
     run_button = st.button(
         "🚀 Run Analysis", type="primary", use_container_width=True)
@@ -473,9 +535,9 @@ with st.sidebar:
 
 # Main Content
 st.markdown("<div id='configure'></div>", unsafe_allow_html=True)
-st.title('Portfolio Optimizer Pro')
+st.title('Portfolio Optimizer AI')
 st.markdown(
-    'Analyze and optimize equity portfolios with cutting-edge weighting strategies. '
+    'Analyze, optimize, and simulate equity portfolios with cutting-edge strategies. '
     '<span style="font-size:0.9rem; color:#6b7280;">For educational purposes only — not investment advice.</span>',
     unsafe_allow_html=True
 )
@@ -500,6 +562,7 @@ with st.spinner('Fetching data and optimizing portfolio …'):
     progress.progress(30)
     price_data = yahoo_timeseries(tickers, period=period)
     benchmark_data = yahoo_timeseries(['^GSPC'], period=period)
+    fundamentals_df = fetch_fundamentals(tickers)
     progress.progress(60)
     if price_data.empty or benchmark_data.empty:
         st.error(
@@ -523,11 +586,15 @@ with st.spinner('Fetching data and optimizing portfolio …'):
         'Inverse Beta': inverse_beta_portfolio(tickers),
         'Maximum Return': max_return_portfolio(price_data),
     }
+    if "custom_weights" in st.session_state and len(st.session_state["custom_weights"]) == len(tickers):
+        weights['Custom Allocation'] = custom_allocation(
+            tickers, st.session_state["custom_weights"])
+
     weights_df = build_weights_dataframe(weights, tickers)
 
-    # Portfolio Returns
-    ret_dict = {name: portfolio_returns(price_data, w)
-                for name, w in weights.items()}
+    # Portfolio Returns with Transaction Costs
+    ret_dict = {name: portfolio_returns(
+        price_data, w) * (1 - transaction_cost/100) for name, w in weights.items()}
     portfolio_returns_df = pd.concat(ret_dict.values(), axis=1)
 
     # Align Benchmark Returns
@@ -553,32 +620,23 @@ with st.spinner('Fetching data and optimizing portfolio …'):
     }).dropna()
     cum_returns_df = (1 + portfolio_returns_df).cumprod()
     drawdown_df = cum_returns_df.div(cum_returns_df.cummax()).subtract(1)
+
+    # Monte Carlo Simulations
+    mc_results = {name: monte_carlo_simulation(price_data.pct_change().dropna(), w, n_simulations)
+                  for name, w in weights.items()}
     progress.progress(100)
     progress.empty()
-
-# Save Portfolio Config
-# with st.sidebar:
-#     if run_button and selected:
-#         config = {"tickers": selected, "period": period,
-#                   "risk_aversion": risk_aversion, "lookback": lookback}
-#         config_json = json.dumps(config).encode("utf-8")
-#         st.download_button(
-#             "💾 Save Portfolio Config",
-#             config_json,
-#             file_name="portfolio_config.json",
-#             mime="application/json",
-#             use_container_width=True
-#         )
 
 # ───────────────────────────────────────── TABS ───────────────────────────────────────────
 
 st.markdown("### Portfolio Analysis Dashboard")
-tab_groups = st.tabs(
-    ["📊 Core Analysis", "⚠️ Risk Insights", "🔍 Advanced Metrics"])
+tab_groups = st.tabs(["📊 Core Analysis", "⚠️ Risk Insights",
+                     "🔍 Advanced Metrics", "🔮 Simulations"])
 
 # Core Analysis
 with tab_groups[0]:
-    core_tabs = st.tabs(["Weights", "Performance", "Price History"])
+    core_tabs = st.tabs(
+        ["Weights", "Performance", "Price History", "Fundamentals"])
     with core_tabs[0]:
         st.subheader("Portfolio Weights by Strategy")
         st.dataframe(
@@ -604,10 +662,6 @@ with tab_groups[0]:
             labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
         ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(chart, use_container_width=True)
-        st.markdown(
-            '<span style="font-size:0.9rem; color:#6b7280;">Chart shows normalized weights of each ticker across strategies.</span>',
-            unsafe_allow_html=True
-        )
         csv = weights_df.to_csv().encode("utf-8")
         st.download_button("📥 Download Weights (CSV)", csv,
                            file_name="weights.csv", mime="text/csv", use_container_width=True)
@@ -661,10 +715,30 @@ with tab_groups[0]:
         ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(price_chart, use_container_width=True)
 
+    with core_tabs[3]:
+        st.subheader("Fundamental Data")
+        st.dataframe(
+            fundamentals_df.style.format({
+                'P/E Ratio': "{:.2f}",
+                'Dividend Yield': "{:.2%}",
+                'Market Cap': "{:.2e}",
+                'Beta': "{:.2f}",
+                'EPS (TTM)': "{:.2f}",
+                'Book Value Per Share': "{:.2f}",
+                'Debt-to-Equity Ratio': "{:.2f}",
+                'Current Ratio': "{:.2f}",
+                'Revenue (TTM)': "{:.2e}",
+                'Profit Margin': "{:.2%}",
+                'Operating Margin': "{:.2%}",
+                'Return on Equity': "{:.2%}"
+            }).background_gradient(cmap="Blues"),
+            use_container_width=True
+        )
+
 # Risk Insights
 with tab_groups[1]:
-    risk_tabs = st.tabs(
-        ["🔗 Correlation", "⚠️ Risk Overview", "📉 Strategy Drawdowns"])
+    risk_tabs = st.tabs(["🔗 Correlation", "⚠️ Risk Overview",
+                        "📉 Strategy Drawdowns", "📊 Risk-Return Scatter"])
     with risk_tabs[0]:
         st.subheader("Correlation Matrix (Returns)")
         corr_matrix = price_data.pct_change().dropna().corr().round(2)
@@ -746,6 +820,25 @@ with tab_groups[1]:
             use_container_width=True,
             height=min(400, 80 + 32 * len(drawdown_df.tail(10)))
         )
+
+    with risk_tabs[3]:
+        st.subheader("Risk-Return Scatter Plot")
+        metrics_df = pd.DataFrame({strategy: performance_metrics(portfolio_returns_df[strategy])
+                                  for strategy in portfolio_returns_df.columns}).T
+        metrics_df['Strategy'] = metrics_df.index
+        scatter_fig = px.scatter(
+            metrics_df,
+            x="Ann. Volatility",
+            y="Ann. Return",
+            color="Strategy",
+            size="Sharpe",
+            hover_data=["Sharpe", "Max Drawdown"],
+            title="Risk-Return Profile by Strategy",
+            labels={"Ann. Volatility": "Annualized Volatility",
+                    "Ann. Return": "Annualized Return"}
+        )
+        scatter_fig.update_layout(showlegend=True, height=450)
+        st.plotly_chart(scatter_fig, use_container_width=True)
 
 # Advanced Metrics
 with tab_groups[2]:
@@ -840,28 +933,48 @@ with tab_groups[2]:
         ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
         st.altair_chart(hist_chart, use_container_width=True)
 
-# Footer with Professional Branding
+# Simulations Tab (Expanded to All Strategies)
+with tab_groups[3]:
+    st.subheader(
+        "Monte Carlo Simulations (1-Year Forecast for All Strategies)")
+    sim_tabs = st.tabs(list(mc_results.keys()))
+
+    for i, strategy in enumerate(mc_results.keys()):
+        with sim_tabs[i]:
+            mc_df = mc_results[strategy]
+            mc_long = mc_df.reset_index().melt(
+                id_vars='index', var_name='Simulation', value_name='Return')
+
+            mc_chart = alt.Chart(mc_long).mark_line(opacity=0.1).encode(
+                x=alt.X("index:N", title="Weeks"),
+                y=alt.Y("Return:Q", title="Cumulative Return"),
+                color=alt.Color("Simulation:N", legend=None)
+            ).properties(
+                height=450,
+                title=alt.Title(f"Monte Carlo Simulation: {strategy}", subtitle=f"{
+                                n_simulations} simulated paths over 1 year")
+            ).configure_view(stroke=None).configure_axis(
+                labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
+            )
+
+            st.altair_chart(mc_chart, use_container_width=True)
+
+            # Summary Metrics
+            final_returns = mc_df.iloc[-1]
+            st.markdown(f"**Simulation Summary for {strategy}**")
+            st.metric("Median Annual Return", f"{final_returns.median():.2%}")
+            st.metric("5th Percentile Return", f"{
+                      final_returns.quantile(0.05):.2%}")
+            st.metric("95th Percentile Return", f"{
+                      final_returns.quantile(0.95):.2%}")
+
+# Footer
 st.markdown(
     """
     <div style="text-align: center; padding: 2rem 0; color: #6b7280;">
         <span>Portfolio Optimizer Pro by Free Investment Education | © 2025 | For educational purposes only.</span><br>
         <a href="https://www.investopedia.com/terms/p/portfolio-weight.asp" style="color: #1e40af;">Learn More</a> | 
         <a href="mailto:freeinvestmenteducation@gmail.com" style="color: #1e40af;">Contact Us</a>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# Inside the `with st.sidebar:` block, after the existing content; ; BuymeaCoffe
-st.markdown(
-    """
-    <div style="text-align: center; margin-top: 1rem;">
-        <a href="https://www.buymeacoffee.com/freeinvestmenteducation" target="_blank">
-            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
-                 alt="Buy Me a Coffee" 
-                 style="height: 45px; width: auto; margin: 0 auto;"/>
-        </a>
     </div>
     """,
     unsafe_allow_html=True
