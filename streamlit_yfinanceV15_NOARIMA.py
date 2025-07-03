@@ -13,22 +13,6 @@ import pandas_datareader.data as web
 import datetime
 import plotly.express as px
 
-# ─────────────────────────────────── Sitemap ────────────────────────────────────
-
-if st.request.path == "/sitemap.xml":
-    sitemap = """<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://portfolioptimizerai.com/</loc>
-    <lastmod>2025-07-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>"""
-    st.set_page_config(content_type="application/xml")
-    st.write(sitemap)
-    st.stop()
-
 # ─────────────────────────────────── CONFIG & GLOBAL STYLE ────────────────────────────────────
 st.set_page_config(
     page_title="Portfolio Optimizer AI",
