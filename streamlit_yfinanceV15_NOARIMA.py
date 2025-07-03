@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -10,158 +11,253 @@ import altair as alt
 import matplotlib.pyplot as plt
 import pandas_datareader.data as web
 import datetime
-from streamlit.components.v1 import html
-import plotly.express as px  # Added for interactive scatter plot
+import plotly.express as px
+
+# ─────────────────────────────────── Sitemap ────────────────────────────────────
+if st.query_params.get("sitemap") == "1":
+    sitemap = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://portfolioptimizerai.com/</loc>
+    <lastmod>2025-07-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>"""
+    st.markdown(f"```xml\n{sitemap}\n```")
+    st.stop()
 
 # ─────────────────────────────────── CONFIG & GLOBAL STYLE ────────────────────────────────────
-
 st.set_page_config(
     page_title="Portfolio Optimizer AI",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Inject Google AdSense meta tag
-st.markdown(
-    '<meta name="google-adsense-account" content="ca-pub-6317750745008007">',
-    unsafe_allow_html=True
-)
-
-# Updated Custom CSS (unchanged from original)
 CUSTOM_CSS = """
 <style>
-/* Global Styles */
-body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-    color: #1f2937;
+body { 
+    font-family: 'Poppins', sans-serif; 
+    background: linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1); 
+    color: #ffffff; 
+    margin: 0;
+    padding: 0;
 }
-
-/* Header Hero Section */
-.hero {
-    text-align: center;
-    padding: 3rem 2rem;
-    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-    border-radius: 12px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-    animation: fadeIn 1s ease-in;
+.hero { 
+    text-align: center; 
+    padding: 5rem 2rem; 
+    background: linear-gradient(135deg, #ff4e50, #f9d423); 
+    border-radius: 20px; 
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); 
+    animation: heroFade 1.5s ease-in-out; 
+    margin: 2rem 1rem; 
 }
-.hero h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #ffffff;
-    margin-bottom: 0.75rem;
+.hero h1 { 
+    font-size: 3.5rem; 
+    font-weight: 900; 
+    color: #ffffff; 
+    text-shadow: 0 3px 6px rgba(0, 0, 0, 0.2); 
+    margin-bottom: 1.5rem; 
 }
-.hero p {
-    font-size: 1.1rem;
-    color: #e5e7eb;
-    margin-bottom: 1.5rem;
+.hero p { 
+    font-size: 1.4rem; 
+    color: #f1f1f1; 
+    margin-bottom: 2.5rem; 
 }
-.hero .cta-button {
-    background: #ffffff;
-    color: #1e40af;
-    font-weight: 600;
-    border-radius: 8px;
-    padding: 0.75rem 2rem;
-    transition: all 0.3s ease;
-    text-decoration: none;
+.hero .cta-button { 
+    background: #f9d423; 
+    color: #ff4e50; 
+    font-weight: 700; 
+    border-radius: 50px; 
+    padding: 1rem 3rem; 
+    text-decoration: none; 
+    font-size: 1.2rem; 
+    transition: all 0.3s ease; 
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); 
 }
-.hero .cta-button:hover {
-    background: #1e40af;
-    color: #ffffff;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+.hero .cta-button:hover { 
+    background: #ff4e50; 
+    color: #ffffff; 
+    transform: scale(1.05); 
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); 
 }
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: #1e40af;
+.stMetric { 
+    background: rgba(255, 255, 255, 0.95); 
+    border-radius: 15px; 
+    padding: 1.8rem; 
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); 
+    transition: transform 0.3s ease, box-shadow 0.3s ease; 
+}
+.stMetric:hover { 
+    transform: translateY(-5px); 
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2); 
+}
+div[data-testid="stTabs"] button { 
+    background: #ffffff; 
+    border: 2px solid #ff6b6b; 
+    border-radius: 15px 15px 0 0; 
+    padding: 1rem 2.5rem; 
+    color: #ff4e50; 
+    font-weight: 700; 
+    transition: all 0.3s ease; 
+}
+div[data-testid="stTabs"] button:hover { 
+    background: #ff6b6b; 
+    color: #ffffff; 
+    transform: translateY(-2px); 
+}
+div[role="graphics-document"] { 
+    background: rgba(255, 255, 255, 0.9); 
+    border-radius: 15px; 
+    padding: 2.5rem; 
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); 
+}
+.dataframe { 
+    border: 2px solid #4ecdc4; 
+    border-radius: 15px; 
+    overflow: hidden; 
+    background: rgba(255, 255, 255, 0.95); 
+}
+.dataframe tbody tr:hover { 
+    background: #f1f1f1; 
+    transition: background 0.2s ease; 
+}
+.dataframe th, .dataframe td { 
+    padding: 1.2rem; 
+    border-bottom: 1px solid #e2e8f0; 
+    font-size: 1rem; 
+    color: #2d3436; 
+}
+@keyframes heroFade { 
+    from { opacity: 0; transform: translateY(20px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+@keyframes slideIn { 
+    from { opacity: 0; transform: translateX(-15px); } 
+    to { opacity: 1; transform: translateX(0); } 
+}
+.st-expander { 
+    background: rgba(255, 255, 255, 0.9); 
+    border-radius: 15px; 
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15); 
+    animation: slideIn 0.6s ease-in-out; 
+}
+.stButton>button { 
+    background: #ff4e50; 
+    color: #ffffff; 
+    border-radius: 50px; 
+    padding: 1rem 2.5rem; 
+    font-weight: 700; 
+    font-size: 1.1rem; 
+    transition: all 0.3s ease; 
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); 
+}
+.stButton>button:hover { 
+    background: #f9d423; 
+    color: #ff4e50; 
+    transform: scale(1.05); 
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); 
+}
+h2, h3 { 
+    color: #ff6b6b; 
+    font-weight: 800; 
+    margin-top: 2rem; 
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
+}
+.stSelectbox, .stSlider, .stNumberInput { 
+    background: rgba(255, 255, 255, 0.95); 
+    border-radius: 10px; 
+    padding: 0.5rem; 
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); 
+}
+@media (max-width: 768px) { 
+    .hero h1 { font-size: 2.5rem; } 
+    .hero p { font-size: 1.1rem; } 
+    .stMetric { padding: 1.2rem; } 
+    div[role="graphics-document"] { padding: 1.5rem; } 
+    .dataframe th, .dataframe td { padding: 0.8rem; font-size: 0.9rem; } 
+    .stButton>button { padding: 0.8rem 1.5rem; font-size: 1rem; } 
+}
+/* Pop-up Styling */
+.popup {
+    position: fixed;
+    top: 100px; /* Distancia desde la parte superior */
+    right: 20px; /* Distancia desde el borde derecho */
+    background: linear-gradient(135deg, #ff4e50, #f9d423);
     color: #ffffff;
     padding: 2rem;
-    border-right: 2px solid #e5e7eb;
-}
-section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] span {
-    color: #ffffff;
-    font-weight: 500;
-}
-section[data-testid="stSidebar"] .stButton > button {
-    background: #ffffff;
-    color: #1e40af;
-    border-radius: 8px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    max-width: 400px; /* Ancho máximo reducido para la esquina */
+    width: 90%;
+    text-align: center;
+    font-size: 1.1rem;
     font-weight: 600;
+    animation: fadeIn 0.5s ease-in-out;
+}
+.popup button {
+    background: #ffffff;
+    color: #ff4e50;
+    border: none;
+    border-radius: 50px;
+    padding: 0.8rem 2rem;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-top: 1.5rem;
+    cursor: pointer;
     transition: all 0.3s ease;
 }
-section[data-testid="stSidebar"] .stButton > button:hover {
-    background: #1e40af;
+.popup button:hover {
+    background: #ff6b6b;
     color: #ffffff;
+    transform: scale(1.05);
 }
-
-/* Cards for Metrics */
-.stMetric {
-    background: #ffffff;
-    border-radius: 10px;
-    padding: 1.25rem;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease;
-}
-.stMetric:hover {
-    transform: translateY(-3px);
-}
-
-/* Tabs */
-div[data-testid="stTabs"] button {
-    background: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 8px 8px 0 0;
-    padding: 0.75rem 1.5rem;
-    color: #1e40af;
-    font-weight: 500;
-}
-div[data-testid="stTabs"] button:hover {
-    background: #eff6ff;
-}
-
-/* Charts */
-div[role="graphics-document"] {
-    background: #ffffff;
-    border-radius: 10px;
-    padding: 1.5rem;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-}
-
-/* DataFrame Styling */
-.dataframe {
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    overflow: hidden;
-}
-.dataframe tbody tr:hover {
-    background: #eff6ff;
-}
-.dataframe th, .dataframe td {
-    padding: 0.75rem;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-/* Animations */
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
-}
-
-/* Mobile Responsiveness */
-@media (max-width: 768px) {
-    .hero h1 { font-size: 1.8rem; }
-    .hero p { font-size: 1rem; }
-    .stMetric { padding: 0.75rem; }
-    div[role="graphics-document"] { padding: 1rem; }
-    .dataframe th, .dataframe td { padding: 0.5rem; }
 }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────── HELPERS ───────────────────────────────────────────
+# Load custom fonts
+st.markdown("""
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
+""", unsafe_allow_html=True)
+
+# Popup Message with Buy Me a Coffee Button
+if "popup_shown" not in st.session_state:
+    st.session_state["popup_shown"] = False
+
+if not st.session_state["popup_shown"]:
+    st.markdown("""
+    <div id="welcome-popup" class="popup">
+        <p>Hi there! 😊 Thanks so much for stopping by — it truly means the world. 
+        If you've found any value in our content and you'd like to support what I do, 
+        a small contribution would go a long way. 💛 Every coffee helps keep Free Investment 
+        Education free, honest, and growing for everyone. You're amazing. Thank you!</p>
+        <div style="text-align: center; margin-top: 1.5rem;">
+            <a href="https://www.buymeacoffee.com/freeinvestmenteducation" target="_blank">
+                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
+                     alt="Support Us" 
+                     style="height: 45px; width: auto;"/>
+            </a>
+        </div>
+    </div>
+    <script>
+        setTimeout(function() {
+            var popup = document.getElementById('welcome-popup');
+            if (popup) {
+                popup.style.display = 'none';
+            }
+        }, 5000);
+    </script>
+    """, unsafe_allow_html=True)
+    st.session_state["popup_shown"] = True
+
+# ─────────────────────────────────── HELPERS ────────────────────────────────────
 
 
 def interest_rates_today_usa():
@@ -204,12 +300,10 @@ def fetch_fundamentals(tickers: list[str]) -> pd.DataFrame:
                 'Dividend Yield': info.get('dividendYield', np.nan),
                 'Market Cap': info.get('marketCap', np.nan),
                 'Beta': info.get('beta', np.nan),
-                # Earnings Per Share (Trailing Twelve Months)
                 'EPS (TTM)': info.get('trailingEps', np.nan),
                 'Book Value Per Share': info.get('bookValue', np.nan),
                 'Debt-to-Equity Ratio': info.get('debtToEquity', np.nan),
                 'Current Ratio': info.get('currentRatio', np.nan),
-                # Trailing Twelve Months Revenue
                 'Revenue (TTM)': info.get('totalRevenue', np.nan),
                 'Profit Margin': info.get('profitMargins', np.nan),
                 'Operating Margin': info.get('operatingMargins', np.nan),
@@ -226,7 +320,7 @@ def fetch_fundamentals(tickers: list[str]) -> pd.DataFrame:
     return pd.DataFrame(fundamentals)
 
 
-def monte_carlo_simulation(returns: pd.DataFrame, weights: pd.Series, n_simulations: int = 400, horizon: int = 52) -> pd.DataFrame:
+def monte_carlo_simulation(returns: pd.DataFrame, weights: pd.Series, n_simulations: int = 500, horizon: int = 52) -> pd.DataFrame:
     mu = returns.mean()
     cov = returns.cov()
     n_assets = len(weights)
@@ -236,7 +330,7 @@ def monte_carlo_simulation(returns: pd.DataFrame, weights: pd.Series, n_simulati
         sim_returns[:, i] = np.cumsum(sim @ weights)
     return pd.DataFrame(sim_returns, columns=[f'Sim {i+1}' for i in range(n_simulations)])
 
-# ---------- ALLOCATION ENGINES (unchanged from original) -------------------------------------
+# ---------- ALLOCATION ENGINES -------------------------------------
 
 
 def portfolio_minimum_variance(data: pd.DataFrame) -> pd.Series:
@@ -436,13 +530,7 @@ def performance_metrics(series: pd.Series, rf: float = RF) -> dict:
     ann_vol = series.std() * np.sqrt(52)
     sharpe = (ann_return - rf) / ann_vol if ann_vol != 0 else np.nan
     mdd = (cum / cum.cummax() - 1).min()
-    return {
-        'Total Return': total_return,
-        'Ann. Return': ann_return,
-        'Ann. Volatility': ann_vol,
-        'Sharpe': sharpe,
-        'Max Drawdown': mdd
-    }
+    return {'Total Return': total_return, 'Ann. Return': ann_return, 'Ann. Volatility': ann_vol, 'Sharpe': sharpe, 'Max Drawdown': mdd}
 
 
 @st.cache_data(show_spinner=False)
@@ -456,94 +544,74 @@ def load_sp500_tickers() -> dict[str, str]:
         st.error(f'Error loading ticker list: {e}')
         return {}
 
+
 # ───────────────────────────────────────────── UI ─────────────────────────────────────────────
-
-
-# Onboarding Hero Section
 if "first_load" not in st.session_state:
     st.session_state["first_load"] = True
     st.markdown(
         """
         <div class="hero">
             <h1>Portfolio Optimizer AI 🤖</h1>
-            <p>Build, analyze, and simulate equity portfolios with advanced weighting strategies and data-driven insights.</p>
-            <a href="#configure" class="cta-button">Start Optimizing</a>
+            <p>Unleash the power of AI to build your dream portfolio with vibrant insights!.</p>
+            <a href="#configure" class="cta-button">Get Started</a>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-# Sidebar with Enhanced UX
-with st.sidebar:
-    st.markdown("<h2 style='color: #ffffff; font-size: 1.5rem;'>Portfolio Optimizer AI</h2>",
-                unsafe_allow_html=True)
-    st.markdown("<p style='color: #e5e7eb;'>Select S&P 500 companies to build and analyze your portfolio.</p>",
-                unsafe_allow_html=True)
-    st.divider()
-
-    # Searchable Multiselect for Companies
-    mapping = load_sp500_tickers()
-    companies = sorted(list(mapping.keys()))
-    selected = st.multiselect(
-        "Choose companies (2–20)",
-        options=companies,
-        default=["Apple Inc.", "Microsoft Corporation"],
-        help="Select 2–20 S&P 500 companies. Type to search.",
-        max_selections=20
-    )
-
-    # Advanced Options Expander
-    with st.expander("⚙️ Advanced Settings"):
-        period = st.selectbox("Data Period", ["1y", "2y", "5y"], index=1)
-        risk_aversion = st.slider(
-            "Risk Aversion (Markowitz)", 0.1, 5.0, 1.0, 0.1)
-        lookback = st.slider("Momentum Lookback (weeks)", 4, 52, 12)
-        n_simulations = st.slider(
-            "Monte Carlo Simulations", 100, 100, 500, 100)
-        transaction_cost = st.slider(
-            "Transaction Cost (%)", 0.0, 1.0, 0.0, 0.01)
-
-    # Custom Allocation Input
-    with st.expander("🛠️ Custom Allocation"):
-        custom_weights = []
-        if selected:
-            st.markdown(
-                "Enter weights (as decimals, e.g., 0.3 for 30%) that sum to 1.0:")
-            for ticker in [mapping[n] for n in selected]:
-                weight = st.number_input(f"Weight for {
-                                         ticker}", min_value=0.0, max_value=1.0, value=1.0/len(selected), step=0.01)
-                custom_weights.append(weight)
-            if st.button("Apply Custom Weights"):
-                st.session_state["custom_weights"] = custom_weights
-
-    run_button = st.button(
-        "🚀 Run Analysis", type="primary", use_container_width=True)
-
-    # Buy Me a Coffee Button
-    st.markdown(
-        """
-        <div style="text-align: center; margin-top: 1.5rem;">
-            <a href="https://www.buymeacoffee.com/freeinvestmenteducation" target="_blank">
-                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
-                     alt="Support Us" 
-                     style="height: 45px; width: auto;"/>
-            </a>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-# Main Content
+# Main Content - Company Selection
 st.markdown("<div id='configure'></div>", unsafe_allow_html=True)
-st.title('Portfolio Optimizer AI')
+st.title('Portfolio Optimizer AI 🤖📈')
 st.markdown(
     'Analyze, optimize, and simulate equity portfolios with cutting-edge strategies. '
-    '<span style="font-size:0.9rem; color:#6b7280;">For educational purposes only — not investment advice.</span>',
+    '<span style="font-size:0.9rem; color:#4a5568;">For educational purposes only — not investment advice.</span>',
     unsafe_allow_html=True
 )
 
+# Searchable Company Selection
+mapping = load_sp500_tickers()
+companies = sorted(list(mapping.keys()))
+selected = st.multiselect(
+    "Choose companies (2–20)",
+    options=companies,
+    default=["Apple Inc.", "Microsoft Corporation"],
+    help="Select 2–20 S&P 500 companies. Type to search.",
+    max_selections=20,
+    key="main_select"
+)
+
+# Advanced Options
+with st.expander("⚙️ Advanced Settings", expanded=False):
+    col1, col2 = st.columns(2)
+    with col1:
+        period = st.selectbox("Data Period", ["1y", "2y", "5y"], index=1)
+        risk_aversion = st.slider(
+            "Risk Aversion (Markowitz)", 0.1, 5.0, 1.0, 0.1)
+    with col2:
+        lookback = st.slider("Momentum Lookback (weeks)", 4, 52, 12)
+        n_simulations = st.slider("Monte Carlo Simulations", 100, 250, 500, 50)
+    transaction_cost = st.slider("Transaction Cost (%)", 0.0, 1.0, 0.0, 0.01)
+
+# Custom Allocation Input
+with st.expander("🛠️ Custom Allocation", expanded=False):
+    custom_weights = []
+    if selected:
+        st.markdown(
+            "Enter weights (as decimals, e.g., 0.3 for 30%) that sum to 1.0:")
+        cols = st.columns(min(len(selected), 5))
+        for i, ticker in enumerate([mapping[n] for n in selected]):
+            with cols[i % len(cols)]:
+                weight = st.number_input(f"Weight for {
+                                         ticker}", min_value=0.0, max_value=1.0, value=1.0/len(selected), step=0.01, key=f"weight_{ticker}")
+                custom_weights.append(weight)
+        if st.button("Apply Custom Weights", use_container_width=True):
+            st.session_state["custom_weights"] = custom_weights
+
+run_button = st.button("🚀 Run Analysis", type="primary",
+                       use_container_width=True)
+
 if not run_button:
-    st.info('Select companies and settings in the sidebar, then click **Run Analysis** to begin.')
+    st.info('Choose stocks and settings, then hit **Launch Analysis** to see the magic!')
     st.stop()
 
 # Input Validation
@@ -607,17 +675,11 @@ with st.spinner('Fetching data and optimizing portfolio …'):
     # Analytics
     rolling_sharpe_df = ((portfolio_returns_df.rolling(ROLL_WINDOW).mean() * 52 - RF) /
                          (portfolio_returns_df.rolling(ROLL_WINDOW).std() * np.sqrt(52))).dropna()
-    beta_vals = {
-        col: np.cov(portfolio_returns_df[col], bmk_returns)[
-            0, 1] / np.var(bmk_returns)
-        if np.var(bmk_returns) != 0 else np.nan
-        for col in portfolio_returns_df.columns
-    }
+    beta_vals = {col: np.cov(portfolio_returns_df[col], bmk_returns)[0, 1] / np.var(bmk_returns) if np.var(bmk_returns) != 0 else np.nan
+                 for col in portfolio_returns_df.columns}
     beta_df = pd.Series(beta_vals, name='Beta').to_frame()
-    rolling_corr_df = pd.DataFrame({
-        col: portfolio_returns_df[col].rolling(ROLL_WINDOW).corr(bmk_returns)
-        for col in portfolio_returns_df.columns
-    }).dropna()
+    rolling_corr_df = pd.DataFrame({col: portfolio_returns_df[col].rolling(ROLL_WINDOW).corr(bmk_returns)
+                                   for col in portfolio_returns_df.columns}).dropna()
     cum_returns_df = (1 + portfolio_returns_df).cumprod()
     drawdown_df = cum_returns_df.div(cum_returns_df.cummax()).subtract(1)
 
@@ -627,24 +689,33 @@ with st.spinner('Fetching data and optimizing portfolio …'):
     progress.progress(100)
     progress.empty()
 
+
+# Buy Me a Coffee Button
+st.markdown(
+    """
+    <div style="text-align: center; margin-top: 1.5rem;">
+        <a href="https://www.buymeacoffee.com/freeinvestmenteducation" target="_blank">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
+                 alt="Support Us" 
+                 style="height: 45px; width: auto;"/>
+        </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 # ───────────────────────────────────────── TABS ───────────────────────────────────────────
-
-st.markdown("### Portfolio Analysis Dashboard")
+st.markdown("### Portfolio Analysis Dashboard", unsafe_allow_html=True)
 tab_groups = st.tabs(["📊 Core Analysis", "⚠️ Risk Insights",
-                     "🔍 Advanced Metrics", "🔮 Simulations"])
+                     "🔍 Advanced Metrics", "🔮 Simulations", "📖 Documentation"])
 
-# Core Analysis
 with tab_groups[0]:
     core_tabs = st.tabs(
         ["Weights", "Performance", "Price History", "Fundamentals"])
     with core_tabs[0]:
         st.subheader("Portfolio Weights by Strategy")
-        st.dataframe(
-            weights_df.style.format(
-                "{:.2%}").background_gradient(cmap="Blues"),
-            use_container_width=True,
-            height=min(480, 80 + 32 * len(tickers))
-        )
+        st.dataframe(weights_df.style.format("{:.2%}").background_gradient(cmap="Blues"),
+                     use_container_width=True, height=min(480, 80 + 32 * len(tickers)))
         long_df = weights_df.T.reset_index().melt(
             id_vars='index', var_name='Ticker', value_name='Weight')
         chart = alt.Chart(long_df).mark_bar().encode(
@@ -653,14 +724,9 @@ with tab_groups[0]:
                     title="Weight", axis=alt.Axis(format="%")),
             color=alt.Color("Ticker:N", scale=alt.Scale(scheme="tableau10")),
             tooltip=["Ticker", alt.Tooltip("Weight", format=".1%")]
-        ).properties(
-            width="container",
-            height=450,
-            title=alt.Title("Portfolio Weights",
-                            subtitle="Allocation across strategies")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
+        ).properties(width="container", height=450, title=alt.Title("Portfolio Weights", subtitle="Allocation across strategies")
+                     ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0"
+                                                                  ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#2b6cb0")
         st.altair_chart(chart, use_container_width=True)
         csv = weights_df.to_csv().encode("utf-8")
         st.download_button("📥 Download Weights (CSV)", csv,
@@ -672,25 +738,19 @@ with tab_groups[0]:
             id_vars='Date', var_name='Strategy', value_name='Cumulative Return')
         selection = alt.selection_single(fields=['Strategy'], bind='legend')
         perf_chart = alt.Chart(cum_df).mark_line().encode(
-            x="Date:T",
-            y="Cumulative Return:Q",
-            color="Strategy:N",
+            x="Date:T", y="Cumulative Return:Q", color="Strategy:N",
             opacity=alt.condition(selection, alt.value(1.0), alt.value(0.3)),
             tooltip=["Date:T", "Strategy", alt.Tooltip(
                 "Cumulative Return:Q", format=".2f")]
-        ).add_selection(selection).interactive().properties(
-            height=450,
-            title=alt.Title("Cumulative Returns",
-                            subtitle="Performance across strategies")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
+        ).add_selection(selection).interactive().properties(height=450, title=alt.Title("Cumulative Returns", subtitle="Performance across strategies")
+                                                            ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0"
+                                                                                                         ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#2b6cb0")
         st.altair_chart(perf_chart, use_container_width=True)
         st.markdown("**Key Performance Metrics**")
-        cols = st.columns(5)
+        cols = st.columns(min(len(portfolio_returns_df.columns), 5))
         for i, strategy in enumerate(portfolio_returns_df.columns):
             metrics = performance_metrics(portfolio_returns_df[strategy])
-            with cols[i % 5]:
+            with cols[i % len(cols)]:
                 st.metric(f"{strategy} Ann. Return", f"{
                           metrics['Ann. Return']:.2%}")
                 st.metric(f"{strategy} Sharpe", f"{metrics['Sharpe']:.2f}")
@@ -702,40 +762,22 @@ with tab_groups[0]:
         price_long = price_data.reset_index().melt(
             id_vars='Date', var_name='Ticker', value_name='Price')
         price_chart = alt.Chart(price_long).mark_line().encode(
-            x="Date:T",
-            y="Price:Q",
-            color="Ticker:N",
+            x="Date:T", y="Price:Q", color="Ticker:N",
             tooltip=["Date:T", "Ticker", alt.Tooltip("Price:Q", format=".2f")]
-        ).interactive().properties(
-            height=450,
-            title=alt.Title("Historical Prices",
-                            subtitle=f"Weekly closing prices for {period}")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
+        ).interactive().properties(height=450, title=alt.Title("Historical Prices", subtitle=f"Weekly closing prices for {period}")
+                                   ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0"
+                                                                                ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#2b6cb0")
         st.altair_chart(price_chart, use_container_width=True)
 
     with core_tabs[3]:
         st.subheader("Fundamental Data")
-        st.dataframe(
-            fundamentals_df.style.format({
-                'P/E Ratio': "{:.2f}",
-                'Dividend Yield': "{:.2%}",
-                'Market Cap': "{:.2e}",
-                'Beta': "{:.2f}",
-                'EPS (TTM)': "{:.2f}",
-                'Book Value Per Share': "{:.2f}",
-                'Debt-to-Equity Ratio': "{:.2f}",
-                'Current Ratio': "{:.2f}",
-                'Revenue (TTM)': "{:.2e}",
-                'Profit Margin': "{:.2%}",
-                'Operating Margin': "{:.2%}",
-                'Return on Equity': "{:.2%}"
-            }).background_gradient(cmap="Blues"),
-            use_container_width=True
-        )
+        st.dataframe(fundamentals_df.style.format({
+            'P/E Ratio': "{:.2f}", 'Dividend Yield': "{:.2%}", 'Market Cap': "{:.2e}", 'Beta': "{:.2f}",
+            'EPS (TTM)': "{:.2f}", 'Book Value Per Share': "{:.2f}", 'Debt-to-Equity Ratio': "{:.2f}",
+            'Current Ratio': "{:.2f}", 'Revenue (TTM)': "{:.2e}", 'Profit Margin': "{:.2%}",
+            'Operating Margin': "{:.2%}", 'Return on Equity': "{:.2%}"
+        }).background_gradient(cmap="Blues"), use_container_width=True)
 
-# Risk Insights
 with tab_groups[1]:
     risk_tabs = st.tabs(["🔗 Correlation", "⚠️ Risk Overview",
                         "📉 Strategy Drawdowns", "📊 Risk-Return Scatter"])
@@ -744,15 +786,15 @@ with tab_groups[1]:
         corr_matrix = price_data.pct_change().dropna().corr().round(2)
         fig, ax = plt.subplots(
             figsize=(len(tickers) * 0.6 + 2, len(tickers) * 0.6 + 2))
-        img = ax.imshow(corr_matrix.values, cmap='viridis', vmin=-1, vmax=1)
+        img = ax.imshow(corr_matrix.values, cmap='coolwarm', vmin=-1, vmax=1)
         ax.set_xticks(range(len(tickers)))
         ax.set_yticks(range(len(tickers)))
         ax.set_xticklabels(tickers, rotation=45, ha='right')
         ax.set_yticklabels(tickers)
         for i in range(len(tickers)):
             for j in range(len(tickers)):
-                ax.text(
-                    j, i, corr_matrix.iloc[i, j], ha='center', va='center', color='white', fontsize=8)
+                ax.text(j, i, corr_matrix.iloc[i, j], ha='center', va='center', color='white' if abs(
+                    corr_matrix.iloc[i, j]) > 0.5 else 'black', fontsize=8)
         cbar = plt.colorbar(img, ax=ax)
         cbar.ax.set_ylabel('Correlation', rotation=270, labelpad=15)
         st.pyplot(fig, clear_figure=True)
@@ -764,36 +806,24 @@ with tab_groups[1]:
         roll_long = roll_vol.reset_index().melt(
             id_vars='Date', var_name='Ticker', value_name='Volatility')
         vol_chart = alt.Chart(roll_long).mark_line().encode(
-            x="Date:T",
-            y="Volatility:Q",
-            color="Ticker:N",
+            x="Date:T", y="Volatility:Q", color="Ticker:N",
             tooltip=["Date:T", "Ticker", alt.Tooltip(
                 "Volatility:Q", format=".2%")]
-        ).interactive().properties(
-            height=400,
-            title=alt.Title(
-                "Rolling Volatility", subtitle="12-week annualized volatility for each ticker")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
+        ).interactive().properties(height=400, title=alt.Title("Rolling Volatility", subtitle="12-week annualized volatility for each ticker")
+                                   ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0"
+                                                                                ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#2b6cb0")
         st.altair_chart(vol_chart, use_container_width=True)
-        st.markdown("**Drawdown Chart (Equal Weight Portfolio)**")
+        st.markdown("**Drawdown Chart Marjory Chart (Equal Weight Portfolio)**")
         eq_series = portfolio_returns(
             price_data, equal_weight_portfolio(price_data))
         dd = (1 + eq_series).cumprod()
         drawdown = dd / dd.cummax() - 1
         dd_df = drawdown.reset_index().rename(columns={0: 'Drawdown'})
         dd_chart = alt.Chart(dd_df).mark_area(opacity=0.7).encode(
-            x="Date:T",
-            y=alt.Y("Drawdown:Q", axis=alt.Axis(format='%')),
+            x="Date:T", y=alt.Y("Drawdown:Q", axis=alt.Axis(format='%')),
             tooltip=["Date:T", alt.Tooltip("Drawdown:Q", format=".1%")]
-        ).properties(
-            height=250,
-            title=alt.Title("Equal Weight Portfolio Drawdown",
-                            subtitle="Maximum loss from peak")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        )
+        ).properties(height=250, title=alt.Title("Equal Weight Portfolio Drawdown", subtitle="Maximum loss from peak")
+                     ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0")
         st.altair_chart(dd_chart, use_container_width=True)
 
     with risk_tabs[2]:
@@ -801,46 +831,27 @@ with tab_groups[1]:
         dd_long = drawdown_df.reset_index().melt(
             id_vars='Date', var_name='Strategy', value_name='Drawdown')
         dd_chart_all = alt.Chart(dd_long).mark_area(opacity=0.7).encode(
-            x="Date:T",
-            y=alt.Y("Drawdown:Q", axis=alt.Axis(format='%')),
-            color="Strategy:N",
-            tooltip=["Date:T", "Strategy", alt.Tooltip(
-                "Drawdown:Q", format=".1%")]
-        ).interactive().properties(
-            height=450,
-            title=alt.Title("Strategy Drawdowns",
-                            subtitle="Maximum loss from peak for each strategy")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
+            x="Date:T", y=alt.Y("Drawdown:Q", axis=alt.Axis(format='%')),
+            color="Strategy:N", tooltip=["Date:T", "Strategy", alt.Tooltip("Drawdown:Q", format=".1%")]
+        ).interactive().properties(height=450, title=alt.Title("Strategy Drawdowns", subtitle="Maximum loss from peak for each strategy")
+                                   ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0"
+                                                                                ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#2b6cb0")
         st.altair_chart(dd_chart_all, use_container_width=True)
-        st.dataframe(
-            drawdown_df.round(3).style.format(
-                "{:.2%}").background_gradient(cmap="Reds"),
-            use_container_width=True,
-            height=min(400, 80 + 32 * len(drawdown_df.tail(10)))
-        )
+        st.dataframe(drawdown_df.round(3).style.format("{:.2%}").background_gradient(cmap="Reds"),
+                     use_container_width=True, height=min(400, 80 + 32 * len(drawdown_df.tail(10))))
 
     with risk_tabs[3]:
         st.subheader("Risk-Return Scatter Plot")
         metrics_df = pd.DataFrame({strategy: performance_metrics(portfolio_returns_df[strategy])
                                   for strategy in portfolio_returns_df.columns}).T
         metrics_df['Strategy'] = metrics_df.index
-        scatter_fig = px.scatter(
-            metrics_df,
-            x="Ann. Volatility",
-            y="Ann. Return",
-            color="Strategy",
-            size="Sharpe",
-            hover_data=["Sharpe", "Max Drawdown"],
-            title="Risk-Return Profile by Strategy",
-            labels={"Ann. Volatility": "Annualized Volatility",
-                    "Ann. Return": "Annualized Return"}
-        )
-        scatter_fig.update_layout(showlegend=True, height=450)
+        scatter_fig = px.scatter(metrics_df, x="Ann. Volatility", y="Ann. Return", color="Strategy",
+                                 size="Sharpe", hover_data=["Sharpe", "Max Drawdown"], title="Risk-Return Profile by Strategy",
+                                 labels={"Ann. Volatility": "Annualized Volatility", "Ann. Return": "Annualized Return"})
+        scatter_fig.update_layout(
+            showlegend=True, height=450, template="plotly_white")
         st.plotly_chart(scatter_fig, use_container_width=True)
 
-# Advanced Metrics
 with tab_groups[2]:
     insight_tabs = st.tabs(["📈 Rolling Sharpe", "📊 Market Beta",
                            "🔗 Rolling Correlation", "📉 Return Distribution"])
@@ -849,69 +860,40 @@ with tab_groups[2]:
         rs_long = rolling_sharpe_df.reset_index().melt(
             id_vars='Date', var_name='Strategy', value_name='Sharpe')
         rs_chart = alt.Chart(rs_long).mark_line().encode(
-            x="Date:T",
-            y="Sharpe:Q",
-            color="Strategy:N",
+            x="Date:T", y="Sharpe:Q", color="Strategy:N",
             tooltip=["Date:T", "Strategy",
                      alt.Tooltip("Sharpe:Q", format=".2f")]
-        ).interactive().properties(
-            height=450,
-            title=alt.Title("Rolling Sharpe Ratios",
-                            subtitle="26-week annualized Sharpe ratios")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
+        ).interactive().properties(height=450, title=alt.Title("Rolling Sharpe Ratios", subtitle="26-week annualized Sharpe ratios")
+                                   ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0"
+                                                                                ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#2b6cb0")
         st.altair_chart(rs_chart, use_container_width=True)
-        st.dataframe(
-            rolling_sharpe_df.round(
-                3).style.background_gradient(cmap="Greens"),
-            use_container_width=True,
-            height=min(400, 80 + 32 * len(rolling_sharpe_df.tail(10)))
-        )
+        st.dataframe(rolling_sharpe_df.round(3).style.background_gradient(cmap="Greens"),
+                     use_container_width=True, height=min(400, 80 + 32 * len(rolling_sharpe_df.tail(10))))
 
     with insight_tabs[1]:
         st.subheader("CAPM Beta vs S&P 500")
         beta_chart = alt.Chart(beta_df.reset_index()).mark_bar().encode(
             x=alt.X("index:N", title="Strategy", sort="-y"),
-            y=alt.Y("Beta:Q"),
-            tooltip=["index", alt.Tooltip("Beta:Q", format=".2f")]
-        ).properties(
-            height=400,
-            title=alt.Title(
-                "Market Beta", subtitle="CAPM beta relative to S&P 500")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        )
+            y=alt.Y("Beta:Q"), tooltip=["index", alt.Tooltip("Beta:Q", format=".2f")]
+        ).properties(height=400, title=alt.Title("Market Beta", subtitle="CAPM beta relative to S&P 500")
+                     ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0")
         st.altair_chart(beta_chart, use_container_width=True)
-        st.dataframe(
-            beta_df.round(3).style.background_gradient(cmap="Purples"),
-            use_container_width=True,
-            height=min(400, 80 + 32 * len(beta_df))
-        )
+        st.dataframe(beta_df.round(3).style.background_gradient(cmap="Purples"),
+                     use_container_width=True, height=min(400, 80 + 32 * len(beta_df)))
 
     with insight_tabs[2]:
         st.subheader("26-Week Rolling Correlation with S&P 500")
         rc_long = rolling_corr_df.reset_index().melt(
             id_vars='Date', var_name='Strategy', value_name='Correlation')
         rc_chart = alt.Chart(rc_long).mark_line().encode(
-            x="Date:T",
-            y=alt.Y("Correlation:Q", scale=alt.Scale(domain=[-1, 1])),
-            color="Strategy:N",
-            tooltip=["Date:T", "Strategy", alt.Tooltip(
-                "Correlation:Q", format=".2f")]
-        ).interactive().properties(
-            height=450,
-            title=alt.Title("Rolling Correlation",
-                            subtitle="26-week correlation with S&P 500")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
+            x="Date:T", y=alt.Y("Correlation:Q", scale=alt.Scale(domain=[-1, 1])),
+            color="Strategy:N", tooltip=["Date:T", "Strategy", alt.Tooltip("Correlation:Q", format=".2f")]
+        ).interactive().properties(height=450, title=alt.Title("Rolling Correlation", subtitle="26-week correlation with S&P 500")
+                                   ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0"
+                                                                                ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#2b6cb0")
         st.altair_chart(rc_chart, use_container_width=True)
-        st.dataframe(
-            rolling_corr_df.round(3).style.background_gradient(cmap="Blues"),
-            use_container_width=True,
-            height=min(400, 80 + 32 * len(rolling_corr_df.tail(10)))
-        )
+        st.dataframe(rolling_corr_df.round(3).style.background_gradient(cmap="Blues"),
+                     use_container_width=True, height=min(400, 80 + 32 * len(rolling_corr_df.tail(10))))
 
     with insight_tabs[3]:
         st.subheader("Weekly Return Distribution")
@@ -921,60 +903,119 @@ with tab_groups[2]:
         hist_chart = alt.Chart(returns_long).mark_bar(opacity=0.7).encode(
             x=alt.X("Return:Q", bin=alt.Bin(
                 maxbins=60), title="Weekly Return"),
-            y=alt.Y("count()", title="Frequency"),
-            color="Strategy:N",
+            y=alt.Y("count()", title="Frequency"), color="Strategy:N",
             tooltip=["Strategy", alt.Tooltip("count()", title="Freq")]
-        ).add_selection(selection).transform_filter(selection).properties(
-            height=450,
-            title=alt.Title("Return Distribution",
-                            subtitle="Distribution of weekly returns by strategy")
-        ).configure_view(stroke=None).configure_axis(
-            labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-        ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#1e40af")
+        ).add_selection(selection).transform_filter(selection).properties(height=450,
+                                                                          title=alt.Title(
+                                                                              "Return Distribution", subtitle="Distribution of weekly returns by strategy")
+                                                                          ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0"
+                                                                                                                       ).configure_legend(labelFont="Inter", titleFont="Inter", titleColor="#2b6cb0")
         st.altair_chart(hist_chart, use_container_width=True)
 
-# Simulations Tab (Expanded to All Strategies)
 with tab_groups[3]:
     st.subheader(
         "Monte Carlo Simulations (1-Year Forecast for All Strategies)")
     sim_tabs = st.tabs(list(mc_results.keys()))
-
     for i, strategy in enumerate(mc_results.keys()):
         with sim_tabs[i]:
             mc_df = mc_results[strategy]
             mc_long = mc_df.reset_index().melt(
                 id_vars='index', var_name='Simulation', value_name='Return')
-
             mc_chart = alt.Chart(mc_long).mark_line(opacity=0.1).encode(
-                x=alt.X("index:N", title="Weeks"),
-                y=alt.Y("Return:Q", title="Cumulative Return"),
+                x=alt.X("index:N", title="Weeks"), y=alt.Y("Return:Q", title="Cumulative Return"),
                 color=alt.Color("Simulation:N", legend=None)
-            ).properties(
-                height=450,
-                title=alt.Title(f"Monte Carlo Simulation: {strategy}", subtitle=f"{
-                                n_simulations} simulated paths over 1 year")
-            ).configure_view(stroke=None).configure_axis(
-                labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#1e40af"
-            )
-
+            ).properties(height=450, title=alt.Title(f"Monte Carlo Simulation: {strategy}", subtitle=f"{n_simulations} simulated paths over 1 year")
+                         ).configure_view(stroke=None).configure_axis(labelFont="Inter", titleFont="Inter", titleFontSize=16, titleColor="#2b6cb0")
             st.altair_chart(mc_chart, use_container_width=True)
-
-            # Summary Metrics
             final_returns = mc_df.iloc[-1]
             st.markdown(f"**Simulation Summary for {strategy}**")
-            st.metric("Median Annual Return", f"{final_returns.median():.2%}")
-            st.metric("5th Percentile Return", f"{
-                      final_returns.quantile(0.05):.2%}")
-            st.metric("95th Percentile Return", f"{
-                      final_returns.quantile(0.95):.2%}")
+            cols = st.columns(3)
+            cols[0].metric("Median Annual Return", f"{
+                           final_returns.median():.2%}")
+            cols[1].metric("5th Percentile Return", f"{
+                           final_returns.quantile(0.05):.2%}")
+            cols[2].metric("95th Percentile Return", f"{
+                           final_returns.quantile(0.95):.2%}")
+
+with tab_groups[4]:
+    st.subheader("Documentation")
+    st.markdown("""
+    This section explains the portfolio optimization strategies, performance metrics, and other key concepts used in this application. Use the tabs below to learn more about each topic.
+    """)
+    doc_tabs = st.tabs(
+        ["Portfolio Strategies", "Performance Metrics", "Risk Metrics", "Fundamentals"])
+
+    with doc_tabs[0]:
+        st.markdown("### Portfolio Strategies")
+        st.markdown("""
+        The application offers various strategies to allocate weights to the selected stocks in your portfolio. Each strategy has a unique approach to balancing risk and return:
+
+        - **Minimum Variance**: Minimizes portfolio volatility by allocating weights to reduce the overall variance, often favoring low-volatility stocks.
+        - **Risk Parity**: Allocates weights so that each asset contributes equally to the portfolio's total risk, using hierarchical clustering to account for correlations.
+        - **Markowitz (Modern Portfolio Theory)**: Optimizes the portfolio by maximizing expected return for a given level of risk, adjusted by the risk aversion parameter (λ).
+        - **Maximum Sharpe**: Maximizes the Sharpe Ratio, which is the portfolio's excess return per unit of risk, relative to the risk-free rate.
+        - **Equal Weight**: Assigns equal weights to all assets, providing a simple and diversified approach.
+        - **Maximum Diversification**: Maximizes the diversification ratio by balancing weights to reduce correlation-driven risk.
+        - **Momentum**: Allocates higher weights to assets with strong recent performance (based on the lookback period).
+        - **Minimum Correlation**: Assigns weights inversely proportional to the average correlation of each asset with others, aiming to reduce portfolio correlation.
+        - **Inverse Volatility**: Allocates weights inversely proportional to each asset's volatility, favoring less volatile stocks.
+        - **Equal Risk Contribution**: Adjusts weights so that each asset contributes equally to the portfolio's total risk, balancing risk contributions.
+        - **Market Cap**: Weights assets based on their market capitalization, mimicking market-weighted indices like the S&P 500.
+        - **Inverse Beta**: Allocates weights inversely proportional to each asset's beta, favoring low-beta stocks to reduce market risk exposure.
+        - **Maximum Return**: Allocates 100% to the asset with the highest historical return, a high-risk strategy.
+        - **Custom Allocation**: Allows users to manually specify weights, which must sum to 100% and be non-negative.
+        """)
+
+    with doc_tabs[1]:
+        st.markdown("### Performance Metrics")
+        st.markdown("""
+        The application provides several metrics to evaluate portfolio performance:
+
+        - **Total Return**: The overall percentage return of the portfolio over the selected period.
+        - **Annualized Return**: The compounded annual return, assuming the portfolio's performance is consistent over a year.
+        - **Annualized Volatility**: A measure of the portfolio's risk, calculated as the standard deviation of weekly returns annualized by multiplying by √52.
+        - **Sharpe Ratio**: The excess return (return above the risk-free rate) per unit of volatility, indicating risk-adjusted performance.
+        - **Maximum Drawdown**: The largest peak-to-trough decline in portfolio value, measuring the worst-case loss.
+        """)
+
+    with doc_tabs[2]:
+        st.markdown("### Risk Metrics")
+        st.markdown("""
+        Risk metrics provide insights into the portfolio's risk profile:
+
+        - **Correlation Matrix**: Shows the pairwise correlations between asset returns, indicating how assets move together.
+        - **Rolling Volatility**: The 12-week annualized volatility of each asset, showing how risk changes over time.
+        - **Drawdown**: The percentage decline from the portfolio's peak value, indicating potential losses during downturns.
+        - **Beta**: Measures the portfolio's sensitivity to market movements (S&P 500), where a beta of 1 indicates market-like volatility.
+        - **Rolling Correlation**: The 26-week correlation of the portfolio with the S&P 500, showing how closely it tracks the market over time.
+        """)
+
+    with doc_tabs[3]:
+        st.markdown("### Fundamental Data")
+        st.markdown("""
+        Fundamental data provides insights into the financial health and valuation of selected companies:
+
+        - **P/E Ratio**: Price-to-earnings ratio, indicating how much investors pay per dollar of earnings.
+        - **Dividend Yield**: The annual dividend payment as a percentage of the stock price.
+        - **Market Cap**: The total market value of a company's outstanding shares.
+        - **Beta**: The stock's volatility relative to the market (S&P 500).
+        - **EPS (TTM)**: Earnings per share over the trailing twelve months.
+        - **Book Value Per Share**: The net asset value per share, calculated as total assets minus liabilities divided by shares outstanding.
+        - **Debt-to-Equity Ratio**: A measure of financial leverage, comparing total debt to shareholders' equity.
+        - **Current Ratio**: The ratio of current assets to current liabilities, indicating liquidity.
+        - **Revenue (TTM)**: Total revenue over the trailing twelve months.
+        - **Profit Margin**: Net income as a percentage of revenue, indicating profitability.
+        - **Operating Margin**: Operating income as a percentage of revenue, reflecting operational efficiency.
+        - **Return on Equity**: Net income divided by shareholders' equity, measuring how effectively equity is used to generate profit.
+        """)
 
 # Footer
 st.markdown(
     """
-    <div style="text-align: center; padding: 2rem 0; color: #6b7280;">
-        <span>Portfolio Optimizer Pro by Free Investment Education | © 2025 | For educational purposes only.</span><br>
-        <a href="https://www.investopedia.com/terms/p/portfolio-weight.asp" style="color: #1e40af;">Learn More</a> | 
-        <a href="mailto:freeinvestmenteducation@gmail.com" style="color: #1e40af;">Contact Us</a>
+    <div style="text-align: center; padding: 2.5rem 0; color: #4a5568; background: #ffffff; border-radius: 12px; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1); margin-top: 2rem;">
+        <span>Portfolio Optimizer AI by Free Investment Education | © 2025 | For educational purposes only.</span><br>
+        <a href="https://www.investopedia.com/terms/p/portfolio-weight.asp" style="color: #2b6cb0;">Learn More</a> |
+        <a href="mailto:freeinvestmenteducation@gmail.com" style="color: #2b6cb0;">Contact Us</a>
     </div>
     """,
     unsafe_allow_html=True
