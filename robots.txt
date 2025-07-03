@@ -1,3 +1,0 @@
-User-agent: *
-Allow: /
-Sitemap: https://portfolioptimizerai.com/sitemap.xml
