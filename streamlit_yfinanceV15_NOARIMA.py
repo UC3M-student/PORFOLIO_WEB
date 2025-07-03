@@ -14,7 +14,8 @@ import datetime
 import plotly.express as px
 
 # ─────────────────────────────────── Sitemap ────────────────────────────────────
-if st.query_params.get("sitemap") == "1":
+
+if st.request.path == "/sitemap.xml":
     sitemap = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -24,7 +25,8 @@ if st.query_params.get("sitemap") == "1":
     <priority>1.0</priority>
   </url>
 </urlset>"""
-    st.markdown(f"```xml\n{sitemap}\n```")
+    st.set_page_config(content_type="application/xml")
+    st.write(sitemap)
     st.stop()
 
 # ─────────────────────────────────── CONFIG & GLOBAL STYLE ────────────────────────────────────
