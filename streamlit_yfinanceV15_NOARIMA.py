@@ -13,6 +13,9 @@ import pandas_datareader.data as web
 import datetime
 import plotly.express as px
 
+# ─────────────────────────────────── Sitemap ────────────────────────────────────
+
+
 # ─────────────────────────────────── CONFIG & GLOBAL STYLE ────────────────────────────────────
 st.set_page_config(
     page_title="Portfolio Optimizer AI",
