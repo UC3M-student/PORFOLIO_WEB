@@ -12,10 +12,19 @@ import matplotlib.pyplot as plt
 import pandas_datareader.data as web
 import datetime
 import plotly.express as px
+import streamlit.web.bootstrap
 
 # ─────────────────────────────────── Sitemap ────────────────────────────────────
+# Verifica si la URL incluye ?sitemap=1
 if st.query_params.get("sitemap") == "1":
-    sitemap = """<?xml version="1.0" encoding="UTF-8"?>
+    # Importar directamente Tornado RequestHandler para emitir respuesta cruda
+    from streamlit.web.server import server_util
+    from tornado.web import RequestHandler
+
+    class XMLHandler(RequestHandler):
+        def get(self):
+            self.set_header("Content-Type", "application/xml")
+            self.write("""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://portfolioptimizerai.com/</loc>
@@ -23,8 +32,10 @@ if st.query_params.get("sitemap") == "1":
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-</urlset>"""
-    st.markdown(f"```xml\n{sitemap}\n```")
+</urlset>""")
+
+    server_util._on_pages_changed()  # Forzar recarga
+    server_util.get_app().add_handlers(r".*", [(r"/.*", XMLHandler)])
     st.stop()
 
 # ─────────────────────────────────── CONFIG & GLOBAL STYLE ────────────────────────────────────
